@@ -4,7 +4,7 @@ import { team } from '../../data/team'
 
 function TeamPage() {
   return (
-    <div className="page">
+    <div className="page team-page">
       <SectionHeader
         eyebrow="Team"
         title="Meet the Builders"

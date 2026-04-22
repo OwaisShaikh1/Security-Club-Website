@@ -7,12 +7,14 @@ import { events } from '../../data/events'
 import { flagships } from '../../data/flagships'
 import { testimonials } from '../../data/testimonials'
 
+import DecodeText from '../../components/effects/DecodeText'
+
 function HomePage() {
   return (
     <div className="page">
       <section className="hero-panel">
         <p className="eyebrow">Security Club DBIT</p>
-        <h1>Hack. Defend. Secure.</h1>
+        <h1><DecodeText text="Hack. Defend. Secure." /></h1>
         <p className="hero-copy">
           Hands-on cybersecurity community for workshops, CTFs, research, and real-world defense skills.
         </p>
@@ -22,7 +24,7 @@ function HomePage() {
         </div>
       </section>
 
-      <section>
+      <section className="about-section">
         <SectionHeader
           eyebrow="About"
           title="Who We Are"
@@ -30,7 +32,7 @@ function HomePage() {
         />
       </section>
 
-      <section>
+      <section className="highlights-section">
         <SectionHeader eyebrow="Highlights" title="What We Focus On" />
         <div className="grid three">
           {['Workshops', 'CTFs', 'Research'].map((item) => (
@@ -42,7 +44,7 @@ function HomePage() {
         </div>
       </section>
 
-      <section>
+      <section className="events-preview-section">
         <SectionHeader eyebrow="Upcoming" title="Events Preview" />
         <div className="grid three">
           {events.slice(0, 3).map((event) => (
@@ -51,7 +53,7 @@ function HomePage() {
         </div>
       </section>
 
-      <section>
+      <section className="flagship-preview-section">
         <SectionHeader eyebrow="Flagships" title="Signature Initiatives" />
         <div className="grid two">
           {flagships.map((flagship) => (
@@ -60,7 +62,7 @@ function HomePage() {
         </div>
       </section>
 
-      <section>
+      <section className="testimonials-section">
         <SectionHeader eyebrow="Voices" title="Member Testimonials" />
         <div className="grid two">
           {testimonials.map((item) => (

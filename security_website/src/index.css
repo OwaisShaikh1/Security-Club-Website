@@ -1,5 +1,5 @@
 :root {
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-family: Inter, 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   line-height: 1.5;
   font-weight: 400;
   color: #e2e8f0;
@@ -8,27 +8,135 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+
+  /* Custom variables for hacker effects */
+  --alien-green: #00ff41;
+  --neon-blue: #38bdf8;
+}
+
+@keyframes binaryDrift {
+  0% { transform: translate3d(0, 0, 0); opacity: 0.1; }
+  50% { transform: translate3d(-2%, 1.5%, 0); opacity: 0.2; }
+  100% { transform: translate3d(1.5%, -1%, 0); opacity: 0.1; }
+}
+
+@keyframes scanPulse {
+  0%, 100% { opacity: 0.28; transform: translateY(0); }
+  50% { opacity: 0.46; transform: translateY(2px); }
+}
+
+@keyframes glitch {
+  0% { transform: translate(0); }
+  20% { transform: translate(-3px, 2px); }
+  40% { transform: translate(-3px, -2px); }
+  60% { transform: translate(3px, 2px); }
+  80% { transform: translate(3px, -2px); }
+  100% { transform: translate(0); }
+}
+
+@keyframes borderRotate {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 100% 50%; }
+}
+
+@keyframes sonarPulse {
+  0% { transform: scale(1); opacity: 0.8; }
+  100% { transform: scale(1.5); opacity: 0; }
+}
+
+@keyframes targetRotate {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to { transform: translate(-50%, -50%) rotate(360deg); }
 }
 
 * {
   box-sizing: border-box;
+  cursor: none !important;
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  background: radial-gradient(circle at 12% 12%, #11284a 0%, #041128 45%, #020617 100%);
+  position: relative;
+  overflow-x: hidden;
+  background: linear-gradient(180deg, #04111f 0%, #020617 100%);
 }
 
-h1,
-h2,
-h3,
-h4,
-p {
+/* Custom Cursor Styles */
+.custom-cursor {
+  position: fixed;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--alien-green);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 9999;
+  mix-blend-mode: screen;
+  transition: width 0.2s, height 0.2s;
+}
+
+.custom-cursor::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--alien-green);
+  border-top-color: transparent;
+  border-bottom-color: transparent;
+  animation: targetRotate 2s linear infinite;
+}
+
+.custom-cursor::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 4px;
+  height: 4px;
+  background: var(--alien-green);
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 8px var(--alien-green);
+}
+
+.custom-cursor.clicking {
+  width: 30px;
+  height: 30px;
+  background: rgba(0, 255, 65, 0.1);
+}
+
+#root {
+  min-height: 100vh;
+  position: relative;
+  z-index: 1;
+}
+
+h1, h2, h3, h4, p {
   margin: 0;
 }
 
 a {
   color: inherit;
+  text-decoration: none;
+}
+
+/* Scanline Effect Overlay */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: linear-gradient(
+    rgba(18, 16, 16, 0) 50%,
+    rgba(0, 0, 0, 0.1) 50%
+  );
+  z-index: 10000;
+  background-size: 100% 4px;
+  pointer-events: none;
+  opacity: 0.15;
 }
