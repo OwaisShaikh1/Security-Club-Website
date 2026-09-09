@@ -8,7 +8,7 @@ export const pageAccess = {
   '/dashboard': 'member',
   '/ctf': 'member',
   '/leaderboard': 'member',
-  '/membership': 'member',
+  '/membership': 'visitor',
   '/team': 'core',
   '/flagships': 'core',
 }

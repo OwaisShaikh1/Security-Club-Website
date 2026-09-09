@@ -16,7 +16,21 @@ The system must support:
 
 The current backend already contains a small `users` table and an `events` table. These should be replaced by the normalized schema below through an explicit migration rather than continued incremental table additions.
 
-## 2. Current frontend inventory
+## 2. Runtime and transport constraints
+
+The backend uses Node's built-in `node:sqlite` through `DatabaseSync`, not
+`better-sqlite3`. This requires Node.js 22.13.0 or newer, is synchronous, and
+does not provide a `.transaction()` helper. Migrations and multi-table writes
+must therefore use explicit `BEGIN`, `COMMIT`, and `ROLLBACK` statements.
+
+The API's CORS policy is configured with the `CORS_ORIGINS` environment variable.
+It supports `GET`, `POST`, `PATCH`, and `DELETE`, and enables credentials for
+explicitly allowed origins so cookie-based authentication can be added without
+another transport rewrite. The development `X-User-Role` header is scaffolding
+only and must be removed or gated outside development before real authentication
+ships.
+
+## 3. Current frontend inventory
 
 The frontend is a Vite React TypeScript application in `security_website/`.
 
@@ -47,7 +61,21 @@ The frontend is a Vite React TypeScript application in `security_website/`.
 
 API DTOs should initially match these shapes where practical, then add IDs, timestamps, status, and pagination metadata.
 
-## 3. Roles and default access
+## 4. Frontend type migration map
+
+The database should be normalized while API DTOs preserve the current frontend
+shape until each page is migrated:
+
+| Frontend field | Database representation | Migration rule |
+|---|---|---|
+| `EventItem.date` | `events.starts_at` and `events.ends_at` | Rename and update date sorting/formatting together |
+| `EventItem.tags` | `event_tags` joined to `tags` | Return `tags: string[]` from the API initially |
+| `Testimonial.role` | `testimonials.role_label` | Keep `role` in the DTO or update the component explicitly |
+| `GalleryItem.event` | `gallery_items.event_id` joined to `events.title` | Do not silently replace the displayed event name with an ID |
+| `LeaderboardEntry.badges` | No v1 source of truth | Drop it initially or design badge tables before wiring the API |
+| `Challenge.solved` | `challenge_solves` for the authenticated user | Omit or return `false` for anonymous requests |
+
+## 5. Roles and default access
 
 Use a role hierarchy for default access:
 
@@ -74,7 +102,7 @@ The hierarchy is a default convenience, not the final authorization model. The f
 
 `visitor` means unauthenticated browsing. Non-members do not need an account or login to view public content.
 
-## 4. Identity and authentication assumptions
+## 6. Identity and authentication assumptions
 
 ### Students and non-members
 
@@ -104,7 +132,7 @@ Recommended future authentication options:
 
 Do not use the current `X-User-Role` header as real authentication. It is suitable only for local development and must be removed or disabled outside development.
 
-## 5. Proposed SQLite schema
+## 7. Proposed SQLite schema
 
 All tables should use integer primary keys, UTC timestamps stored as ISO-8601 text, foreign keys, and indexes for foreign-key and status columns.
 

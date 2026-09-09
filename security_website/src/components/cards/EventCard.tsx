@@ -1,12 +1,15 @@
 import type { EventItem } from '../../types'
 import Badge from '../ui/Badge'
+import Button from '../ui/Button'
 import BaseCard from './BaseCard'
 
 interface EventCardProps {
   event: EventItem
+  onRegister?: () => void
+  registrationStatus?: 'registered' | 'waitlisted' | 'registering'
 }
 
-function EventCard({ event }: EventCardProps) {
+function EventCard({ event, onRegister, registrationStatus }: EventCardProps) {
   return (
     <BaseCard>
       <div className="card-topline">
@@ -20,6 +23,19 @@ function EventCard({ event }: EventCardProps) {
           <span key={tag} className="tag">#{tag}</span>
         ))}
       </div>
+      {onRegister ? (
+        <div className="actions">
+          <Button type="button" variant="outline" onClick={onRegister} disabled={registrationStatus === 'registering'}>
+            {registrationStatus === 'registering'
+              ? 'Registering...'
+              : registrationStatus === 'registered'
+                ? 'Registered'
+                : registrationStatus === 'waitlisted'
+                  ? 'Waitlisted'
+                  : 'Register'}
+          </Button>
+        </div>
+      ) : null}
     </BaseCard>
   )
 }

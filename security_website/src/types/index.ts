@@ -1,4 +1,6 @@
+export type UserRole = 'admin' | 'core' | 'member' | 'visitor'
 export type EventType = 'workshop' | 'ctf' | 'seminar'
+export type EventStatus = 'draft' | 'published' | 'cancelled' | 'completed'
 
 export interface EventItem {
   id: number
@@ -7,6 +9,71 @@ export interface EventItem {
   type: EventType
   description: string
   tags: string[]
+  slug?: string
+  summary?: string
+  venue?: string | null
+  starts_at?: string
+  ends_at?: string | null
+  registration_open_at?: string | null
+  registration_close_at?: string | null
+  capacity?: number | null
+  status?: EventStatus
+}
+
+export interface EventInput {
+  title: string
+  summary: string
+  description: string
+  starts_at: string
+  type: EventType
+  tags: string[]
+  venue?: string
+  ends_at?: string
+  registration_open_at?: string
+  registration_close_at?: string
+  capacity?: number
+  status?: EventStatus
+  slug?: string
+}
+
+export interface MembershipApplicationInput {
+  fullName: string
+  studentId: string
+  branch: string
+  academicYear: number
+  rollNumber: string
+  collegeEmail: string
+  personalEmail?: string
+  phone?: string
+  graduationYear?: number
+  interestArea: string
+  motivation?: string
+}
+
+export interface MembershipApplicationResponse {
+  id: number
+  status: 'submitted' | 'under_review' | 'approved' | 'rejected' | 'withdrawn'
+}
+
+export interface AuthUser {
+  id: number
+  email: string
+  displayName: string
+  role: UserRole
+}
+
+export interface AuthSession {
+  authenticated: boolean
+  role: UserRole
+  user: AuthUser | null
+  permissions: string[]
+}
+
+export type RegistrationRole = 'visitor' | 'admin'
+
+export interface EventRegistrationResponse {
+  eventId: number
+  status: 'registered' | 'waitlisted' | 'cancelled' | 'attended'
 }
 
 export interface Flagship {

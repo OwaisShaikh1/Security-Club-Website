@@ -159,6 +159,16 @@ main {
   overflow: hidden;
 }
 
+.auth-page {
+  display: flex;
+  justify-content: center;
+  padding: 2rem 0;
+}
+
+.auth-card {
+  width: min(100%, 30rem);
+}
+
 .page {
   display: flex;
   flex-direction: column;
