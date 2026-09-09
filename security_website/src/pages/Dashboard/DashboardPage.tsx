@@ -1,5 +1,6 @@
 import StatCard from '../../components/cards/StatCard'
 import SectionHeader from '../../components/common/SectionHeader'
+import DraggableWorkspace from '../../components/layout/DraggableWorkspace'
 
 const activity = [
   'Solved Packet Ghost challenge',
@@ -9,7 +10,7 @@ const activity = [
 
 function DashboardPage() {
   return (
-    <div className="page">
+    <DraggableWorkspace pageKey="dashboard">
       <SectionHeader
         eyebrow="Dashboard"
         title="Member Snapshot"
@@ -30,7 +31,7 @@ function DashboardPage() {
           ))}
         </ul>
       </article>
-    </div>
+    </DraggableWorkspace>
   )
 }
 

@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import EventCard from '../../components/cards/EventCard'
 import FlagshipCard from '../../components/cards/FlagshipCard'
 import SectionHeader from '../../components/common/SectionHeader'
+import DraggableWorkspace from '../../components/layout/DraggableWorkspace'
 import Button from '../../components/ui/Button'
 import { events } from '../../data/events'
 import { flagships } from '../../data/flagships'
@@ -11,7 +12,7 @@ import DecodeText from '../../components/effects/DecodeText'
 
 function HomePage() {
   return (
-    <div className="page">
+    <DraggableWorkspace pageKey="home">
       <section className="hero-panel">
         <p className="eyebrow">Security Club DBIT</p>
         <h1><DecodeText text="Hack. Defend. Secure." /></h1>
@@ -74,7 +75,7 @@ function HomePage() {
           ))}
         </div>
       </section>
-    </div>
+    </DraggableWorkspace>
   )
 }
 

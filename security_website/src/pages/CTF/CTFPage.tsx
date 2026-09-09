@@ -1,11 +1,12 @@
 import ChallengeCard from '../../components/cards/ChallengeCard'
 import SectionHeader from '../../components/common/SectionHeader'
+import DraggableWorkspace from '../../components/layout/DraggableWorkspace'
 import Button from '../../components/ui/Button'
 import { challenges } from '../../data/ctf'
 
 function CTFPage() {
   return (
-    <div className="page">
+    <DraggableWorkspace pageKey="ctf">
       <SectionHeader
         eyebrow="CTF Arena"
         title="Capture The Flag"
@@ -32,7 +33,7 @@ function CTFPage() {
 
         <Button type="submit">Submit Flag</Button>
       </form>
-    </div>
+    </DraggableWorkspace>
   )
 }
 

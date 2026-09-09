@@ -1,10 +1,11 @@
 import TeamCard from '../../components/cards/TeamCard'
 import SectionHeader from '../../components/common/SectionHeader'
+import DraggableWorkspace from '../../components/layout/DraggableWorkspace'
 import { team } from '../../data/team'
 
 function TeamPage() {
   return (
-    <div className="page team-page">
+    <DraggableWorkspace pageKey="team">
       <SectionHeader
         eyebrow="Team"
         title="Meet the Builders"
@@ -16,7 +17,7 @@ function TeamPage() {
           <TeamCard key={member.id} member={member} />
         ))}
       </div>
-    </div>
+    </DraggableWorkspace>
   )
 }
 

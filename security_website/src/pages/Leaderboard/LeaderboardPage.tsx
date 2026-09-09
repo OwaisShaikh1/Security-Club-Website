@@ -1,10 +1,11 @@
 import SectionHeader from '../../components/common/SectionHeader'
+import DraggableWorkspace from '../../components/layout/DraggableWorkspace'
 import Badge from '../../components/ui/Badge'
 import { leaderboard } from '../../data/leaderboard'
 
 function LeaderboardPage() {
   return (
-    <div className="page">
+    <DraggableWorkspace pageKey="leaderboard">
       <SectionHeader
         eyebrow="Leaderboard"
         title="Top Performers"
@@ -39,7 +40,7 @@ function LeaderboardPage() {
           </tbody>
         </table>
       </div>
-    </div>
+    </DraggableWorkspace>
   )
 }
 

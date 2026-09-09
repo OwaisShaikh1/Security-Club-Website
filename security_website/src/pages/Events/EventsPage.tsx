@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import EventCard from '../../components/cards/EventCard'
 import SectionHeader from '../../components/common/SectionHeader'
+import DraggableWorkspace from '../../components/layout/DraggableWorkspace'
 import { events } from '../../data/events'
 import type { EventType } from '../../types'
 
@@ -13,7 +14,7 @@ function EventsPage() {
   )
 
   return (
-    <div className="page">
+    <DraggableWorkspace pageKey="events">
       <section className="events-main-section">
         <SectionHeader
           eyebrow="Events"
@@ -37,7 +38,7 @@ function EventsPage() {
           ))}
         </div>
       </section>
-    </div>
+    </DraggableWorkspace>
   )
 }
 

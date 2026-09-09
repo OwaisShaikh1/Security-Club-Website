@@ -1,11 +1,12 @@
 import SectionHeader from '../../components/common/SectionHeader'
+import DraggableWorkspace from '../../components/layout/DraggableWorkspace'
 import Button from '../../components/ui/Button'
 
 const benefits = ['Access to CTFs', 'Workshops and labs', 'Mentor support', 'Networking opportunities']
 
 function MembershipPage() {
   return (
-    <div className="page">
+    <DraggableWorkspace pageKey="membership">
       <SectionHeader
         eyebrow="Membership"
         title="Join the Security Club"
@@ -41,7 +42,7 @@ function MembershipPage() {
           <Button type="submit">Submit Application</Button>
         </form>
       </div>
-    </div>
+    </DraggableWorkspace>
   )
 }
 
