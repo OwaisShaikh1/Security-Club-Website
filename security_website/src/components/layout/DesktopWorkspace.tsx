@@ -35,30 +35,52 @@ function overlaps(x: number, y: number, width: number, height: number, panel: Pa
     y + height > panel.y
 }
 
+function isPanelPositionFree(panels: Panel[], path: string, x: number, y: number, width: number, height: number) {
+  return !panels.some((panel) => panel.route.path !== path && overlaps(x, y, width, height, panel))
+}
+
 function arrangePanels(panels: Panel[], left: number, surfaceWidth: number, surfaceHeight: number) {
   const automatic = panels.filter((panel) => !panel.customized)
   const fixed = panels.filter((panel) => panel.customized)
   if (automatic.length === 0) return panels
 
   const availableWidth = Math.max(260, surfaceWidth - left - 24)
-  const columns = Math.min(3, Math.max(1, Math.ceil(Math.sqrt(panels.length))))
-  const rows = Math.ceil(panels.length / columns)
-  const width = Math.max(220, Math.floor((availableWidth - (columns - 1) * 12) / columns))
-  const height = Math.max(180, Math.floor((surfaceHeight - 24 - (rows - 1) * 12) / rows))
+  const minWidth = 160
+  const minHeight = 140
+  const placed = fixed.map((panel) => ({
+    ...panel,
+    x: Math.max(left + 12, Math.min(panel.x, surfaceWidth - panel.width - 12)),
+    y: Math.max(12, Math.min(panel.y, surfaceHeight - panel.height - 12)),
+  }))
+  const baseWidth = Math.max(minWidth, Math.floor((availableWidth - 24) / 2))
+  const baseHeight = Math.max(minHeight, Math.floor((surfaceHeight - 36) / 2))
 
   return panels.map((panel) => {
-    if (panel.customized) return panel
-    const index = automatic.indexOf(panel)
-    const column = index % columns
-    const row = Math.floor(index / columns)
-    const x = left + 12 + column * (width + 12)
-    let y = 12 + row * (height + 12)
-
-    while (fixed.some((item) => overlaps(x, y, width, height, item))) {
-      y += height + 12
+    if (panel.customized) {
+      return placed.find((item) => item.route.path === panel.route.path) ?? panel
     }
 
-    return { ...panel, x, y, width, height }
+    for (let width = baseWidth; width >= minWidth; width -= 20) {
+      for (let height = baseHeight; height >= minHeight; height -= 20) {
+        for (let y = 12; y + height <= surfaceHeight - 12; y += 12) {
+          for (let x = left + 12; x + width <= surfaceWidth - 12; x += 12) {
+            if (!placed.some((item) => overlaps(x, y, width, height, item))) {
+              const nextPanel = { ...panel, x, y, width, height }
+              placed.push(nextPanel)
+              return nextPanel
+            }
+          }
+        }
+      }
+    }
+
+    return {
+      ...panel,
+      x: left + 12,
+      y: 12,
+      width: minWidth,
+      height: minHeight,
+    }
   })
 }
 
@@ -101,6 +123,7 @@ function DesktopWorkspace({ routes }: DesktopWorkspaceProps) {
   }, [])
 
   const openPanel = (route: AppRoute) => {
+    if (!panels[route.path] && Object.keys(panels).length >= 3) return
     const surface = surfaceRef.current
     if (!surface) return
 
@@ -238,19 +261,37 @@ function DesktopWorkspace({ routes }: DesktopWorkspaceProps) {
               })
             }}
             onPositionChange={(position) => {
-              setPanels((current) => ({
-                ...current,
-                [panel.route.path]: { ...current[panel.route.path], ...position, customized: true },
-              }))
+              setPanels((current) => {
+                const existing = current[panel.route.path]
+                if (!existing || !isPanelPositionFree(Object.values(current), panel.route.path, position.x, position.y, existing.width, existing.height)) {
+                  return current
+                }
+                return {
+                  ...current,
+                  [panel.route.path]: { ...existing, ...position, customized: true },
+                }
+              })
             }}
             onSizeChange={(size) => {
               setPanels((current) => {
                 const existing = current[panel.route.path]
                 if (!existing || (existing.width === size.width && existing.height === size.height)) return current
-                return {
-                  ...current,
-                  [panel.route.path]: { ...existing, ...size, customized: true },
+                const maxWidth = Math.max(160, surfaceSize.width - Math.max(260, activePaneWidth || Math.floor(surfaceSize.width * 0.52)) - 24)
+                const nextPanel = {
+                  ...existing,
+                  width: Math.min(size.width, maxWidth),
+                  height: Math.min(size.height, Math.max(140, surfaceSize.height - 24)),
+                  customized: true,
                 }
+                const arranged = arrangePanels(
+                  Object.values(current).map((item) =>
+                    item.route.path === panel.route.path ? nextPanel : { ...item, customized: false },
+                  ),
+                  Math.max(260, activePaneWidth || Math.floor(surfaceSize.width * 0.52)),
+                  surfaceSize.width,
+                  surfaceSize.height,
+                )
+                return Object.fromEntries(arranged.map((item) => [item.route.path, item]))
               })
             }}
           >

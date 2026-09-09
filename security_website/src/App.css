@@ -35,7 +35,7 @@
   position: relative;
   flex: 1;
   border: 1px solid #1a2f3c;
-  overflow: auto;
+  overflow: visible;
   min-height: 0;
   scrollbar-width: thin;
   scrollbar-color: #35576d transparent;
@@ -53,16 +53,24 @@
   scrollbar-color: #35576d transparent;
   overscroll-behavior: contain;
   overflow-anchor: none;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .desktop-fullpage-view > .page {
   min-height: calc(100% - 0.2rem);
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 .desktop-workspace.split-view .desktop-fullpage-view {
   width: calc(var(--active-pane-width, 52%) - 0.35rem);
+  max-width: calc(var(--active-pane-width, 52%) - 0.35rem);
   right: auto;
   border-right: 1px solid #1a2f3c;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .desktop-pane-resizer {
@@ -352,6 +360,8 @@ main {
   padding: 0;
   overflow: hidden;
   background: #000000;
+  opacity: 1;
+  isolation: isolate;
   resize: both;
 }
 
@@ -386,8 +396,9 @@ main {
   color: #8db5ca;
   padding: 0;
   margin: 0;
-  line-height: 1;
+  line-height: 2;
   cursor: pointer;
+  
 }
 
 .panel-close-button:focus,
@@ -412,6 +423,7 @@ main {
   scrollbar-color: #3c647b transparent;
   overscroll-behavior: contain;
   overflow-anchor: none;
+  background: #000000;
 }
 
 .desktop-surface::-webkit-scrollbar,
@@ -526,6 +538,16 @@ main {
 .page .card,
 .page .gallery-card {
   animation: none;
+}
+
+.card.panel-draggable {
+  background: #000000;
+  opacity: 1;
+  isolation: isolate;
+}
+
+.card.panel-draggable .panel-content {
+  background: #000000;
 }
 
 
