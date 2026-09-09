@@ -1,9 +1,10 @@
 import SectionHeader from '../../components/common/SectionHeader'
+import DraggableWorkspace from '../../components/layout/DraggableWorkspace'
 import { gallery } from '../../data/gallery'
 
 function GalleryPage() {
   return (
-    <div className="page">
+    <DraggableWorkspace pageKey="gallery">
       <SectionHeader
         eyebrow="Gallery"
         title="Snapshots from Sessions"
@@ -21,7 +22,7 @@ function GalleryPage() {
           </article>
         ))}
       </div>
-    </div>
+    </DraggableWorkspace>
   )
 }
 

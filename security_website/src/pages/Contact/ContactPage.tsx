@@ -1,9 +1,10 @@
 import SectionHeader from '../../components/common/SectionHeader'
+import DraggableWorkspace from '../../components/layout/DraggableWorkspace'
 import Button from '../../components/ui/Button'
 
 function ContactPage() {
   return (
-    <div className="page">
+    <DraggableWorkspace pageKey="contact">
       <SectionHeader
         eyebrow="Contact"
         title="Get in Touch"
@@ -32,7 +33,7 @@ function ContactPage() {
           <Button type="submit" variant="secondary">Send Message</Button>
         </form>
       </div>
-    </div>
+    </DraggableWorkspace>
   )
 }
 

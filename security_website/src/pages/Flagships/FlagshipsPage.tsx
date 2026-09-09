@@ -1,10 +1,11 @@
 import FlagshipCard from '../../components/cards/FlagshipCard'
 import SectionHeader from '../../components/common/SectionHeader'
+import DraggableWorkspace from '../../components/layout/DraggableWorkspace'
 import { flagships } from '../../data/flagships'
 
 function FlagshipsPage() {
   return (
-    <div className="page">
+    <DraggableWorkspace pageKey="flagships">
       <SectionHeader
         eyebrow="Flagships"
         title="Club Signature Programs"
@@ -16,7 +17,7 @@ function FlagshipsPage() {
           <FlagshipCard key={flagship.id} flagship={flagship} />
         ))}
       </div>
-    </div>
+    </DraggableWorkspace>
   )
 }
 

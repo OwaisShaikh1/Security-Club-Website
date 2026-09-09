@@ -1,7 +1,12 @@
-import type { PropsWithChildren } from 'react'
+import type { CSSProperties, PropsWithChildren } from 'react'
 
-function BaseCard({ children }: PropsWithChildren) {
-  return <article className="card">{children}</article>
+interface BaseCardProps extends PropsWithChildren {
+  className?: string
+  style?: CSSProperties
+}
+
+function BaseCard({ children, className, style }: BaseCardProps) {
+  return <article className={["card", className].filter(Boolean).join(' ')} style={style}>{children}</article>
 }
 
 export default BaseCard
