@@ -6,6 +6,7 @@ import type {
   MembershipApplicationInput,
   MembershipApplicationResponse,
   UserRole,
+  CorePosition,
 } from '../types'
 
 const apiBaseUrl = import.meta.env.VITE_API_URL ?? 'http://localhost:3001/api'
@@ -55,7 +56,8 @@ function jsonBody(value: unknown): RequestInit {
 }
 
 export async function getAuthSession(): Promise<AuthSession> {
-  return request<AuthSession>('/auth/me')
+  const session = await request<AuthSession & { positions?: CorePosition[] }>('/auth/me')
+  return { ...session, positions: session.positions ?? [] }
 }
 
 export async function getCurrentRole(): Promise<UserRole> {
@@ -128,3 +130,89 @@ export async function registerForEvent(id: number): Promise<EventRegistrationRes
 export async function cancelEventRegistration(id: number): Promise<{ ok: true }> {
   return request<{ ok: true }>(`/events/${id}/registrations`, { method: 'DELETE' })
 }
+
+export interface ArchitecturePermission {
+  id: number
+  key: string
+  description: string
+  enabled: boolean
+}
+
+export interface ArchitectureRole {
+  id: number
+  key: string
+  name: string
+  description: string
+  hierarchy_level: number
+  permissions: ArchitecturePermission[]
+}
+
+export interface CorePositionAssignment {
+  id: number
+  key: string
+  name: string
+  description: string
+  display_order: number
+  user_id: number | null
+  display_name: string | null
+  email: string | null
+}
+
+export interface AdminUser {
+  id: number
+  email: string
+  display_name: string
+  status: string
+  role: UserRole
+  position_keys: string[]
+}
+
+export interface CommentItem {
+  id: number
+  entity_type: string
+  entity_id: number
+  body: string
+  created_at: string
+  updated_at: string
+  author_id: number
+  author_name: string
+}
+
+export async function getAdminArchitecture(): Promise<{ roles: ArchitectureRole[]; positions: CorePositionAssignment[]; users: AdminUser[] }> {
+  return request('/admin/architecture')
+}
+
+export async function setRolePermission(roleKey: string, permissionKey: string, enabled: boolean): Promise<void> {
+  await request(`/admin/roles/${encodeURIComponent(roleKey)}/permissions/${encodeURIComponent(permissionKey)}`, {
+    method: 'PATCH',
+    ...jsonBody({ enabled }),
+  })
+}
+
+export async function assignCorePosition(userId: number, positionKey: string): Promise<void> {
+  await request(`/admin/users/${userId}/positions`, {
+    method: 'POST',
+    ...jsonBody({ positionKey }),
+  })
+}
+
+export async function removeCorePosition(userId: number, positionKey: string): Promise<void> {
+  await request(`/admin/users/${userId}/positions/${encodeURIComponent(positionKey)}`, { method: 'DELETE' })
+}
+
+export async function setUserRole(userId: number, role: 'member' | 'core'): Promise<void> {
+  await request(`/admin/users/${userId}/role`, { method: 'PATCH', ...jsonBody({ role }) })
+}
+
+export async function getComments(entityType: string, entityId: number): Promise<CommentItem[]> {
+  return request<CommentItem[]>(`/comments/${encodeURIComponent(entityType)}/${entityId}`)
+}
+
+export async function addComment(entityType: string, entityId: number, body: string): Promise<{ id: number; status: 'created' }> {
+  return request<{ id: number; status: 'created' }>(`/comments/${encodeURIComponent(entityType)}/${entityId}`, {
+    method: 'POST',
+    ...jsonBody({ body }),
+  })
+}
+
+export type { CorePosition }

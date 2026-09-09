@@ -169,6 +169,138 @@ main {
   width: min(100%, 30rem);
 }
 
+.admin-role-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr));
+  gap: 1rem;
+}
+
+.permission-list {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.permission-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.55rem;
+  border: 1px solid #1a2f3c;
+}
+
+.permission-row span {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.permission-row small {
+  color: #8ba7b8;
+}
+
+.workspace-status,
+.workspace-links,
+.workspace-card-heading,
+.position-assignment-form,
+.position-assignment-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.workspace-card-heading {
+  justify-content: space-between;
+}
+
+.workspace-position-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  gap: 0.8rem;
+}
+
+.workspace-position-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.scope-list {
+  margin: 0;
+  padding-left: 1.2rem;
+  color: #b2cede;
+}
+
+.review-panel {
+  margin-top: 0.8rem;
+}
+
+.review-comments {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0.7rem 0;
+}
+
+.review-comments li {
+  display: grid;
+  gap: 0.15rem;
+  border-left: 2px solid #2f607b;
+  padding-left: 0.55rem;
+}
+
+.review-comments span {
+  color: #b2cede;
+  white-space: pre-wrap;
+}
+
+.review-compose {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.review-compose textarea,
+.position-assignment-form input,
+.position-assignment-form select {
+  width: 100%;
+  border: 1px solid #2b4f64;
+  border-radius: 2px;
+  background: #04090d;
+  color: #d7e7f2;
+  padding: 0.55rem;
+  font: inherit;
+}
+
+.position-assignment-form input,
+.position-assignment-form select {
+  flex: 1 1 10rem;
+  width: auto;
+}
+
+.position-assignment-list {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: 0.8rem;
+}
+
+.position-assignment-row {
+  justify-content: space-between;
+  border: 1px solid #1a2f3c;
+  padding: 0.55rem;
+}
+
+.position-assignment-row span {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.position-assignment-row small {
+  color: #8ba7b8;
+}
+
+.form-error {
+  color: #fda4af;
+}
+
 .page {
   display: flex;
   flex-direction: column;

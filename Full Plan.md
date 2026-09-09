@@ -77,6 +77,40 @@ shape until each page is migrated:
 
 ## 5. Roles and default access
 
+### Core-team position architecture
+
+Core-team positions are assignments attached to users, separate from the
+coarse account role:
+
+1. Faculty Coordinator
+2. President
+3. Vice-president
+4. Editorial Head
+5. Technical Head
+6. Research Head
+7. Event Head
+
+Position holders receive read and comment permissions by default. A position
+does not grant write, delete, publish, payment, membership-review, or
+permission-management access. The administrator can explicitly enable or
+disable any permission for any role from the admin control panel.
+
+Default responsibility scopes:
+
+| Position | Primary scope | Default access |
+|---|---|---|
+| Faculty Coordinator | Faculty liaison, compliance, oversight | Read/comment |
+| President | Strategy, approvals, club-wide coordination | Read/comment |
+| Vice-president | Operations, continuity, coordination | Read/comment |
+| Editorial Head | Editorial content and communications | Read/comment |
+| Technical Head | Technical programs, CTF, engineering review | Read/comment |
+| Research Head | Research activities, documentation, knowledge review | Read/comment |
+| Event Head | Event planning, schedules, and event feedback | Read/comment |
+
+The database stores these in `core_positions` and `user_positions`. This
+allows one user to hold multiple positions without creating duplicate account
+roles.
+
 Use a role hierarchy for default access:
 
 ```text

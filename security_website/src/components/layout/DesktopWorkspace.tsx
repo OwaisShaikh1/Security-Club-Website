@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type PointerEvent } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import type { AppRoute } from '../../app/routes'
 import DraggablePanel from './DraggablePanel'
 
@@ -85,7 +86,10 @@ function arrangePanels(panels: Panel[], left: number, surfaceWidth: number, surf
 }
 
 function DesktopWorkspace({ routes }: DesktopWorkspaceProps) {
-  const [activePath, setActivePath] = useState(routes[0]?.path ?? '/')
+  const location = useLocation()
+  const navigate = useNavigate()
+  const initialPath = routes.some((route) => route.path === location.pathname) ? location.pathname : (routes[0]?.path ?? '/')
+  const [selectedPath, setSelectedPath] = useState(initialPath)
   const [panels, setPanels] = useState<Record<string, Panel>>({})
   const [surfaceSize, setSurfaceSize] = useState<SurfaceSize>({ width: 0, height: 0 })
   const [activePaneWidth, setActivePaneWidth] = useState(0)
@@ -94,7 +98,8 @@ function DesktopWorkspace({ routes }: DesktopWorkspaceProps) {
   const paneResizeRef = useRef<{ pointerId: number; startX: number; startWidth: number } | null>(null)
   const activePaneWidthRef = useRef(0)
 
-  const activeRoute = routes.find((route) => route.path === activePath)
+  const activePath = routes.some((route) => route.path === location.pathname) ? location.pathname : selectedPath
+  const activeRoute = routes.find((route) => route.path === activePath) ?? routes[0]
 
   useEffect(() => {
     activePaneWidthRef.current = activePaneWidth
@@ -175,7 +180,10 @@ function DesktopWorkspace({ routes }: DesktopWorkspaceProps) {
     const gesture = gestureRef.current
     if (!gesture || gesture.pointerId !== event.pointerId) return
 
-    if (!gesture.opened) setActivePath(gesture.path)
+    if (!gesture.opened) {
+      setSelectedPath(gesture.path)
+      navigate(gesture.path)
+    }
     gestureRef.current = null
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId)

@@ -67,6 +67,15 @@ export interface AuthSession {
   role: UserRole
   user: AuthUser | null
   permissions: string[]
+  positions: CorePosition[]
+}
+
+export interface CorePosition {
+  id: number
+  key: string
+  name: string
+  description: string
+  displayOrder: number
 }
 
 export type RegistrationRole = 'visitor' | 'admin'

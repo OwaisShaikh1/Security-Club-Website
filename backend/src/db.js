@@ -181,6 +181,46 @@ if (schemaVersion < 1) {
     try { db.exec('ROLLBACK') } catch { /* preserve original migration error */ }
     throw error
   }
+
+}
+
+const currentSchemaVersion = Number(db.prepare('SELECT COALESCE(MAX(version), 0) AS version FROM schema_migrations').get().version)
+if (currentSchemaVersion < 2) {
+  db.exec('BEGIN IMMEDIATE')
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS core_positions (
+        id INTEGER PRIMARY KEY,
+        key TEXT NOT NULL UNIQUE,
+        name TEXT NOT NULL,
+        description TEXT NOT NULL,
+        display_order INTEGER NOT NULL DEFAULT 0
+      );
+      CREATE TABLE IF NOT EXISTS user_positions (
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        position_id INTEGER NOT NULL REFERENCES core_positions(id) ON DELETE CASCADE,
+        assigned_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        assigned_at TEXT NOT NULL,
+        PRIMARY KEY (user_id, position_id)
+      );
+      CREATE TABLE IF NOT EXISTS comments (
+        id INTEGER PRIMARY KEY,
+        author_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        entity_type TEXT NOT NULL,
+        entity_id INTEGER NOT NULL,
+        body TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_user_positions_position ON user_positions(position_id);
+      CREATE INDEX IF NOT EXISTS idx_comments_entity ON comments(entity_type, entity_id, created_at);
+    `)
+    db.prepare('INSERT INTO schema_migrations(version, name, applied_at) VALUES (?, ?, ?)').run(2, 'core positions and comments', new Date().toISOString())
+    db.exec('COMMIT')
+  } catch (error) {
+    try { db.exec('ROLLBACK') } catch { /* preserve original migration error */ }
+    throw error
+  }
 }
 
 export const now = () => new Date().toISOString()
@@ -230,7 +270,9 @@ function seed() {
     ['challenges.submit', 'Submit challenge flags'], ['events.register', 'Register for events'],
     ['events.create', 'Create events'], ['events.update', 'Update events'], ['events.delete', 'Delete events'],
     ['events.publish', 'Publish events'], ['events.heads', 'Assign event heads'], ['membership.review', 'Review applications'],
-    ['membership.payment', 'Confirm payments'], ['content.manage', 'Manage content'], ['users.manage', 'Manage users'],
+    ['membership.payment', 'Confirm payments'],     ['content.read', 'Read managed content'], ['content.comment', 'Comment on managed content'],
+    ['content.manage', 'Write managed content'], ['users.manage', 'Manage users'],
+    ['permissions.manage', 'Manage role permissions'], ['positions.manage', 'Manage core positions'],
   ]
   const insertRole = db.prepare('INSERT OR IGNORE INTO roles(key,name,hierarchy_level,description) VALUES(?,?,?,?)')
   roles.forEach((row) => insertRole.run(...row))
@@ -241,11 +283,23 @@ function seed() {
   const mappings = {
     visitor: ['pages.view_public', 'contact.create', 'membership.apply'],
     member: ['pages.view_public', 'contact.create', 'membership.apply', 'pages.view_member', 'challenges.submit', 'events.register'],
-    core: permissions.map(([key]) => key).filter((key) => !['users.manage', 'membership.review', 'membership.payment'].includes(key)),
+    core: ['pages.view_public', 'contact.create', 'membership.apply', 'pages.view_member', 'challenges.submit', 'events.register', 'content.read', 'content.comment'],
     admin: permissions.map(([key]) => key),
   }
   const map = db.prepare('INSERT OR IGNORE INTO role_permissions(role_id,permission_id) VALUES(?,?)')
   Object.entries(mappings).forEach(([role, keys]) => keys.forEach((key) => map.run(roleId(role), permissionId(key))))
+
+  const positions = [
+    ['faculty-coordinator', 'Faculty Coordinator', 'Faculty oversight, guidance, and institutional coordination.', 1],
+    ['president', 'President', 'Club leadership, strategy, and coordination.', 2],
+    ['vice-president', 'Vice-president', 'Leadership support, operations, and continuity.', 3],
+    ['editorial-head', 'Editorial Head', 'Editorial planning, publishing review, and communications.', 4],
+    ['technical-head', 'Technical Head', 'Technical program planning and engineering review.', 5],
+    ['research-head', 'Research Head', 'Research planning, review, and knowledge coordination.', 6],
+    ['event-head', 'Event Head', 'Event planning, scheduling, and delivery coordination.', 7],
+  ]
+  const positionInsert = db.prepare('INSERT OR IGNORE INTO core_positions(key,name,description,display_order) VALUES(?,?,?,?)')
+  positions.forEach((position) => positionInsert.run(...position))
 
   const typeRows = [['workshop', 'Workshop', 'Hands-on learning'], ['ctf', 'Capture The Flag', 'Competitive security challenge'], ['seminar', 'Seminar', 'Talk or seminar']]
   const typeInsert = db.prepare('INSERT OR IGNORE INTO event_types(key,name,description) VALUES(?,?,?)')

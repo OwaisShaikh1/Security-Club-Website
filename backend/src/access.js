@@ -11,6 +11,7 @@ export const pageAccess = {
   '/membership': 'visitor',
   '/team': 'core',
   '/flagships': 'core',
+  '/admin': 'admin',
 }
 
 const rank = { visitor: 0, member: 1, core: 2, admin: 3 }

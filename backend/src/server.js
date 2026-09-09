@@ -35,6 +35,21 @@ function permissionKeys(role) {
   return db.prepare(`SELECT p.key FROM permissions p JOIN role_permissions rp ON rp.permission_id=p.id
     JOIN roles r ON r.id=rp.role_id WHERE r.key=?`).all(role).map((row) => row.key)
 }
+function userPermissionKeys(userId, role) {
+  const permissions = permissionKeys(role)
+  if (userId && db.prepare('SELECT 1 FROM user_positions WHERE user_id=? LIMIT 1').get(userId)) {
+    for (const permission of ['content.read', 'content.comment']) {
+      if (!permissions.includes(permission)) permissions.push(permission)
+    }
+  }
+  return permissions
+}
+function userPositions(userId) {
+  if (!userId) return []
+  return db.prepare(`SELECT cp.id,cp.key,cp.name,cp.description,cp.display_order AS displayOrder
+    FROM core_positions cp JOIN user_positions up ON up.position_id=cp.id
+    WHERE up.user_id=? ORDER BY cp.display_order`).all(userId)
+}
 function loadUser(request) {
   const token = parseCookies(request.headers.cookie ?? '').sc_session
   if (!token) return null
@@ -43,13 +58,15 @@ function loadUser(request) {
     WHERE s.token_hash=? AND s.expires_at > ?`).get(hashToken(token), now())
   if (!row || row.status !== 'active') return null
   db.prepare('UPDATE sessions SET last_seen_at=? WHERE id=?').run(now(), row.session_id)
-  return { ...row, permissions: permissionKeys(row.role) }
+  return { ...row, permissions: userPermissionKeys(row.id, row.role), positions: userPositions(row.id) }
 }
 app.use((request, _response, next) => {
   request.user = loadUser(request)
   if (!request.user && !production) {
     const role = request.header('x-user-role')
-    if (roles.includes(role)) request.user = { id: null, email: null, display_name: 'Development user', role, permissions: permissionKeys(role) }
+    if (roles.includes(role)) request.user = {
+      id: null, email: null, display_name: 'Development user', role, permissions: permissionKeys(role), positions: [],
+    }
   }
   next()
 })
@@ -179,6 +196,7 @@ app.get('/api/auth/me', (request, response) => send(response, {
   authenticated: Boolean(request.user?.id), role: roleOf(request), user: request.user?.id ? {
     id: request.user.id, email: request.user.email, displayName: request.user.display_name,
   } : null, permissions: request.user?.permissions ?? permissionKeys('visitor'),
+  positions: request.user?.positions ?? [],
 }))
 app.post('/api/auth/register', (request, response, next) => {
   try {
@@ -491,6 +509,122 @@ app.post('/api/admin/memberships/:id/confirm-payment', requireAuth, requirePermi
       db.prepare("UPDATE users SET status='active',email_verified_at=COALESCE(email_verified_at,?),updated_at=? WHERE id=?").run(timestamp, timestamp, membership.user_id)
     })
     audit(request, 'confirm_payment', 'membership', id, membership, { status: 'active', expires_at: expires }); send(response, { id, status: 'active', startsAt: timestamp, expiresAt: expires })
+  } catch (error) { next(error) }
+})
+
+app.get('/api/admin/architecture', requireAuth, requirePermission('permissions.manage'), (request, response, next) => {
+  try {
+    const permissionRows = db.prepare('SELECT id,key,description FROM permissions ORDER BY key').all()
+    const roleRows = db.prepare('SELECT id,key,name,description,hierarchy_level FROM roles ORDER BY hierarchy_level DESC').all()
+    const enabled = db.prepare('SELECT role_id,permission_id FROM role_permissions').all()
+    const enabledSet = new Set(enabled.map((row) => `${row.role_id}:${row.permission_id}`))
+    const rolePermissions = roleRows.map((role) => ({
+      ...role,
+      permissions: permissionRows.map((permission) => ({
+        ...permission,
+        enabled: enabledSet.has(`${role.id}:${permission.id}`),
+      })),
+    }))
+    const positions = db.prepare(`SELECT cp.id,cp.key,cp.name,cp.description,
+      up.user_id,u.display_name,u.email
+      FROM core_positions cp
+      LEFT JOIN user_positions up ON up.position_id=cp.id
+      LEFT JOIN users u ON u.id=up.user_id
+      ORDER BY cp.display_order,u.display_name`).all()
+    const users = db.prepare(`SELECT u.id,u.email,u.display_name,u.status,r.key AS role,
+      GROUP_CONCAT(cp.key) AS position_keys
+      FROM users u JOIN roles r ON r.id=u.role_id
+      LEFT JOIN user_positions up ON up.user_id=u.id
+      LEFT JOIN core_positions cp ON cp.id=up.position_id
+      GROUP BY u.id ORDER BY u.display_name`).all().map((user) => ({
+      ...user,
+      position_keys: user.position_keys ? user.position_keys.split(',') : [],
+    }))
+    send(response, { roles: rolePermissions, positions, users })
+  } catch (error) { next(error) }
+})
+
+app.patch('/api/admin/users/:userId/role', requireAuth, requirePermission('users.manage'), (request, response, next) => {
+  try {
+    const userId = integer(request.params, 'userId', { min: 1 })
+    const roleKey = value(request.body, 'role', { max: 40 })
+    if (!roles.includes(roleKey) || roleKey === 'visitor') throw fail(400, 'Role must be member or core')
+    if (userId === request.user.id && roleKey !== 'admin') throw fail(400, 'You cannot remove your own admin role')
+    const role = db.prepare('SELECT id FROM roles WHERE key=?').get(roleKey)
+    const user = db.prepare('SELECT id,email FROM users WHERE id=?').get(userId)
+    if (!role || !user) throw fail(404, 'User or role not found')
+    db.prepare('UPDATE users SET role_id=?,updated_at=? WHERE id=?').run(role.id, now(), userId)
+    audit(request, 'change_role', 'user', userId, null, { role: roleKey })
+    send(response, { id: userId, role: roleKey })
+  } catch (error) { next(error) }
+})
+
+app.patch('/api/admin/roles/:roleKey/permissions/:permissionKey', requireAuth, requirePermission('permissions.manage'), (request, response, next) => {
+  try {
+    const roleKey = value(request.params, 'roleKey', { max: 80 })
+    const permissionKey = value(request.params, 'permissionKey', { max: 120 })
+    const enabled = request.body?.enabled
+    if (typeof enabled !== 'boolean') throw fail(400, 'enabled must be a boolean')
+    if (roleKey === 'admin' && permissionKey === 'permissions.manage' && !enabled) {
+      throw fail(400, 'The admin permission manager cannot disable its own access')
+    }
+    const role = db.prepare('SELECT id FROM roles WHERE key=?').get(roleKey)
+    const permission = db.prepare('SELECT id FROM permissions WHERE key=?').get(permissionKey)
+    if (!role || !permission) throw fail(404, 'Role or permission not found')
+    if (enabled) {
+      db.prepare('INSERT OR IGNORE INTO role_permissions(role_id,permission_id) VALUES(?,?)').run(role.id, permission.id)
+    } else {
+      db.prepare('DELETE FROM role_permissions WHERE role_id=? AND permission_id=?').run(role.id, permission.id)
+    }
+    audit(request, enabled ? 'enable_permission' : 'disable_permission', 'role', role.id, null, { roleKey, permissionKey, enabled })
+    send(response, { role: roleKey, permission: permissionKey, enabled })
+  } catch (error) { next(error) }
+})
+
+app.post('/api/admin/users/:userId/positions', requireAuth, requirePermission('positions.manage'), (request, response, next) => {
+  try {
+    const userId = integer(request.params, 'userId', { min: 1 })
+    const positionKey = value(request.body, 'positionKey', { max: 80 })
+    const user = db.prepare('SELECT id FROM users WHERE id=?').get(userId)
+    const position = db.prepare('SELECT id FROM core_positions WHERE key=?').get(positionKey)
+    if (!user || !position) throw fail(404, 'User or core position not found')
+    db.prepare('INSERT OR IGNORE INTO user_positions(user_id,position_id,assigned_by,assigned_at) VALUES(?,?,?,?)').run(userId, position.id, request.user.id, now())
+    audit(request, 'assign_position', 'user', userId, null, { positionKey })
+    send(response, { ok: true })
+  } catch (error) { next(error) }
+})
+
+app.delete('/api/admin/users/:userId/positions/:positionKey', requireAuth, requirePermission('positions.manage'), (request, response, next) => {
+  try {
+    const userId = integer(request.params, 'userId', { min: 1 })
+    const positionKey = value(request.params, 'positionKey', { max: 80 })
+    const result = db.prepare(`DELETE FROM user_positions
+      WHERE user_id=? AND position_id=(SELECT id FROM core_positions WHERE key=?)`).run(userId, positionKey)
+    if (!result.changes) throw fail(404, 'Position assignment not found')
+    audit(request, 'remove_position', 'user', userId, null, { positionKey })
+    send(response, { ok: true })
+  } catch (error) { next(error) }
+})
+
+app.get('/api/comments/:entityType/:entityId', requireAuth, requirePermission('content.read'), (request, response, next) => {
+  try {
+    const entityId = integer(request.params, 'entityId', { min: 1 })
+    send(response, db.prepare(`SELECT c.id,c.entity_type,c.entity_id,c.body,c.created_at,c.updated_at,
+      u.id AS author_id,u.display_name AS author_name
+      FROM comments c JOIN users u ON u.id=c.author_user_id
+      WHERE c.entity_type=? AND c.entity_id=? ORDER BY c.created_at`).all(request.params.entityType, entityId))
+  } catch (error) { next(error) }
+})
+
+app.post('/api/comments/:entityType/:entityId', requireAuth, requirePermission('content.comment'), (request, response, next) => {
+  try {
+    const entityId = integer(request.params, 'entityId', { min: 1 })
+    const body = value(request.body, 'body', { max: 5000 })
+    const timestamp = now()
+    const result = db.prepare(`INSERT INTO comments(author_user_id,entity_type,entity_id,body,created_at,updated_at)
+      VALUES(?,?,?,?,?,?)`).run(request.user.id, request.params.entityType, entityId, body, timestamp, timestamp)
+    audit(request, 'comment', request.params.entityType, entityId, null, { commentId: Number(result.lastInsertRowid) })
+    send(response, { id: Number(result.lastInsertRowid), status: 'created' }, 201)
   } catch (error) { next(error) }
 })
 
