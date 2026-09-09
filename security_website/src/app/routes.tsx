@@ -9,6 +9,7 @@ import HomePage from '../pages/Home/HomePage'
 import LeaderboardPage from '../pages/Leaderboard/LeaderboardPage'
 import MembershipPage from '../pages/Membership/MembershipPage'
 import TeamPage from '../pages/Team/TeamPage'
+import type { UserRole } from '../api/client'
 
 export interface NavItem {
   path: string
@@ -19,19 +20,20 @@ export interface AppRoute {
   path: string
   label: string
   element: ReactNode
+  requiredRole: UserRole
 }
 
 export const appRoutes: AppRoute[] = [
-  { path: '/', label: 'Home', element: <HomePage /> },
-  { path: '/events', label: 'Events', element: <EventsPage /> },
-  { path: '/flagships', label: 'Flagships', element: <FlagshipsPage /> },
-  { path: '/team', label: 'Team', element: <TeamPage /> },
-  { path: '/gallery', label: 'Gallery', element: <GalleryPage /> },
-  { path: '/leaderboard', label: 'Leaderboard', element: <LeaderboardPage /> },
-  { path: '/membership', label: 'Membership', element: <MembershipPage /> },
-  { path: '/contact', label: 'Contact', element: <ContactPage /> },
-  { path: '/dashboard', label: 'Dashboard', element: <DashboardPage /> },
-  { path: '/ctf', label: 'CTF', element: <CTFPage /> },
+  { path: '/', label: 'Home', element: <HomePage />, requiredRole: 'visitor' },
+  { path: '/events', label: 'Events', element: <EventsPage />, requiredRole: 'visitor' },
+  { path: '/flagships', label: 'Flagships', element: <FlagshipsPage />, requiredRole: 'core' },
+  { path: '/team', label: 'Team', element: <TeamPage />, requiredRole: 'core' },
+  { path: '/gallery', label: 'Gallery', element: <GalleryPage />, requiredRole: 'visitor' },
+  { path: '/leaderboard', label: 'Leaderboard', element: <LeaderboardPage />, requiredRole: 'member' },
+  { path: '/membership', label: 'Membership', element: <MembershipPage />, requiredRole: 'member' },
+  { path: '/contact', label: 'Contact', element: <ContactPage />, requiredRole: 'visitor' },
+  { path: '/dashboard', label: 'Dashboard', element: <DashboardPage />, requiredRole: 'member' },
+  { path: '/ctf', label: 'CTF', element: <CTFPage />, requiredRole: 'member' },
 ]
 
 export const navItems: NavItem[] = appRoutes.map(({ path, label }) => ({ path, label }))
