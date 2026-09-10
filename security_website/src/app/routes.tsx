@@ -9,8 +9,10 @@ import HomePage from '../pages/Home/HomePage'
 import LeaderboardPage from '../pages/Leaderboard/LeaderboardPage'
 import MembershipPage from '../pages/Membership/MembershipPage'
 import TeamPage from '../pages/Team/TeamPage'
+import ProfilePage from '../pages/Profile/ProfilePage'
 import LoginPage from '../pages/Auth/LoginPage'
 import RegisterPage from '../pages/Auth/RegisterPage'
+import ActivatePage from '../pages/Auth/ActivatePage'
 import AdminPage from '../pages/Admin/AdminPage'
 import CoreWorkspacePage from '../pages/Core/CoreWorkspacePage'
 import FacultyCoordinatorPage from '../pages/Core/FacultyCoordinatorPage'
@@ -47,8 +49,10 @@ export const appRoutes: AppRoute[] = [
   { path: '/contact', label: 'Contact', element: <ContactPage />, requiredRole: 'visitor' },
   { path: '/dashboard', label: 'Dashboard', element: <DashboardPage />, requiredRole: 'member', requiredPermission: 'pages.view_member' },
   { path: '/ctf', label: 'CTF', element: <CTFPage />, requiredRole: 'member', requiredPermission: 'pages.view_member' },
+  { path: '/profile', label: 'Profile', element: <ProfilePage />, requiredRole: 'member' },
   { path: '/login', label: 'Log in', element: <LoginPage />, requiredRole: 'visitor' },
   { path: '/register', label: 'Register', element: <RegisterPage />, requiredRole: 'visitor' },
+  { path: '/activate', label: 'Activate', element: <ActivatePage />, requiredRole: 'visitor' },
   { path: '/admin', label: 'Admin', element: <AdminPage />, requiredRole: 'admin', requiredPermission: 'permissions.manage' },
   { path: '/core-workspace', label: 'Core Workspace', element: <CoreWorkspacePage />, requiredRole: 'member', requiredPermission: 'content.read' },
   { path: '/core/faculty-coordinator', label: 'Faculty Coordinator', element: <FacultyCoordinatorPage />, requiredRole: 'member', requiredPermission: 'content.read', requiredPosition: 'faculty-coordinator' },

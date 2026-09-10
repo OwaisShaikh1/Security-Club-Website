@@ -90,6 +90,10 @@ export async function logout(): Promise<void> {
   await request('/auth/logout', { method: 'POST' })
 }
 
+export async function activateAccount(token: string, password: string): Promise<void> {
+  await request('/auth/activate', { method: 'POST', ...jsonBody({ token, password }) })
+}
+
 export async function submitMembershipApplication(
   application: MembershipApplicationInput,
 ): Promise<MembershipApplicationResponse> {

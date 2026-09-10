@@ -3,7 +3,7 @@ import { randomBytes } from 'node:crypto'
 import {
   db, hashPassword, verifyPassword, hashToken, sha256, slugify, now, transaction,
 } from './db.js'
-import { canAccess, pageAccess, roles } from './access.js'
+import { roles } from './access.js'
 import { timingSafeEqual } from 'node:crypto'
 
 const app = express()
@@ -37,9 +37,14 @@ function permissionKeys(role) {
 }
 function userPermissionKeys(userId, role) {
   const permissions = permissionKeys(role)
-  if (userId && db.prepare('SELECT 1 FROM user_positions WHERE user_id=? LIMIT 1').get(userId)) {
-    for (const permission of ['content.read', 'content.comment']) {
-      if (!permissions.includes(permission)) permissions.push(permission)
+  if (userId) {
+    const positionPermissions = db.prepare(`SELECT p.key
+      FROM position_permissions pp
+      JOIN permissions p ON p.id=pp.permission_id
+      JOIN user_positions up ON up.position_id=pp.position_id
+      WHERE up.user_id=?`).all(userId)
+    for (const { key } of positionPermissions) {
+      if (!permissions.includes(key)) permissions.push(key)
     }
   }
   return permissions
@@ -261,13 +266,21 @@ app.post('/api/auth/refresh', requireAuth, (request, response, next) => {
   } catch (error) { next(error) }
 })
 
-app.get('/api/pages/access', (request, response) => send(response, {
-  role: roleOf(request), pages: Object.entries(pageAccess).filter(([, required]) => canAccess(roleOf(request), required)).map(([path]) => path),
-}))
-app.get('/api/pages/:pageKey', (request, response, next) => {
-  const requiredRole = pageAccess[`/${request.params.pageKey}`]
-  if (requiredRole && !canAccess(roleOf(request), requiredRole)) return next(fail(403, 'Page access denied'))
-  send(response, { pageKey: request.params.pageKey, role: roleOf(request), access: 'granted' })
+app.post('/api/auth/activate', (request, response, next) => {
+  try {
+    const token = value(request.body, 'token', { max: 200 })
+    const password = value(request.body, 'password', { max: 200 })
+    if (password.length < 8) throw fail(400, 'password must be at least 8 characters')
+    const tokenRow = db.prepare(`SELECT id,user_id FROM activation_tokens
+      WHERE token_hash=? AND used_at IS NULL AND expires_at > ?`).get(hashToken(token), now())
+    if (!tokenRow) throw fail(400, 'Activation token is invalid or expired')
+    const timestamp = now()
+    transaction(() => {
+      db.prepare('UPDATE users SET password_hash=?,updated_at=? WHERE id=?').run(hashPassword(password), timestamp, tokenRow.user_id)
+      db.prepare('UPDATE activation_tokens SET used_at=? WHERE id=?').run(timestamp, tokenRow.id)
+    })
+    send(response, { ok: true })
+  } catch (error) { next(error) }
 })
 
 app.get('/api/events', (_request, response, next) => {
@@ -401,6 +414,289 @@ app.get('/api/site-settings', (_request, response, next) => {
   } catch (error) { next(error) }
 })
 
+app.post('/api/gallery', requireAuth, requirePermission('gallery.manage'), (request, response, next) => {
+  try {
+    const eventId = integer(request.body, 'eventId', { required: false, min: 1 })
+    const imageUrl = value(request.body, 'imageUrl', { required: false, max: 500 }) ?? value(request.body, 'image_url', { required: false, max: 500 })
+    const caption = value(request.body, 'caption', { required: false, max: 500 })
+    const takenAt = iso(request.body, 'takenAt', false) ?? iso(request.body, 'taken_at', false)
+    const published = request.body?.published !== undefined ? Boolean(request.body.published) : true
+    if (!imageUrl) throw fail(400, 'imageUrl is required')
+    if (eventId && !db.prepare('SELECT 1 FROM events WHERE id=?').get(eventId)) throw fail(404, 'Event not found')
+    const timestamp = now();
+    const result = db.prepare(`INSERT INTO gallery_items(event_id,image_url,caption,taken_at,published,created_by,created_at,updated_at)
+      VALUES(?,?,?,?,?,?,?,?)`).run(eventId ?? null, imageUrl, caption, takenAt, published ? 1 : 0, request.user.id, timestamp, timestamp)
+    audit(request, 'create', 'gallery_item', Number(result.lastInsertRowid), null, { id: Number(result.lastInsertRowid) })
+    send(response, { id: Number(result.lastInsertRowid), event_id: eventId ?? null, image_url: imageUrl, caption, taken_at: takenAt, published }, 201)
+  } catch (error) { next(error) }
+})
+app.patch('/api/gallery/:id', requireAuth, requirePermission('gallery.manage'), (request, response, next) => {
+  try {
+    const id = integer({ id: request.params.id }, 'id', { min: 1 })
+    const before = db.prepare('SELECT * FROM gallery_items WHERE id=?').get(id)
+    if (!before) throw fail(404, 'Gallery item not found')
+    const eventId = request.body.eventId !== undefined ? integer(request.body, 'eventId', { required: false, min: 1 }) : before.event_id
+    const imageUrl = request.body.imageUrl !== undefined ? value(request.body, 'imageUrl', { required: false, max: 500 }) : before.image_url
+    const caption = request.body.caption !== undefined ? value(request.body, 'caption', { required: false, max: 500 }) : before.caption
+    const takenAt = request.body.takenAt !== undefined ? iso(request.body, 'takenAt', false) : before.taken_at
+    const published = request.body.published !== undefined ? Boolean(request.body.published) : Boolean(before.published)
+    if (!imageUrl) throw fail(400, 'imageUrl is required')
+    if (eventId && !db.prepare('SELECT 1 FROM events WHERE id=?').get(eventId)) throw fail(404, 'Event not found')
+    const timestamp = now();
+    db.prepare(`UPDATE gallery_items SET event_id=?,image_url=?,caption=?,taken_at=?,published=?,updated_at=? WHERE id=?`)
+      .run(eventId ?? null, imageUrl, caption, takenAt, published ? 1 : 0, timestamp, id)
+    audit(request, 'update', 'gallery_item', id, before, db.prepare('SELECT * FROM gallery_items WHERE id=?').get(id))
+    send(response, { id, event_id: eventId ?? null, image_url: imageUrl, caption, taken_at: takenAt, published })
+  } catch (error) { next(error) }
+})
+app.delete('/api/gallery/:id', requireAuth, requirePermission('gallery.manage'), (request, response, next) => {
+  try {
+    const id = integer({ id: request.params.id }, 'id', { min: 1 })
+    const before = db.prepare('SELECT * FROM gallery_items WHERE id=?').get(id)
+    if (!before) throw fail(404, 'Gallery item not found')
+    db.prepare('UPDATE gallery_items SET published=0,updated_at=? WHERE id=?').run(now(), id)
+    audit(request, 'archive', 'gallery_item', id, before, db.prepare('SELECT * FROM gallery_items WHERE id=?').get(id))
+    send(response, { ok: true })
+  } catch (error) { next(error) }
+})
+
+app.post('/api/testimonials', requireAuth, requirePermission('testimonials.manage'), (request, response, next) => {
+  try {
+    const name = value(request.body, 'name', { max: 160 })
+    const quote = value(request.body, 'quote', { max: 2000 })
+    const roleLabel = value(request.body, 'roleLabel', { required: false, max: 160 }) ?? value(request.body, 'role_label', { required: false, max: 160 })
+    const imageUrl = value(request.body, 'imageUrl', { required: false, max: 500 }) ?? value(request.body, 'image_url', { required: false, max: 500 })
+    const published = request.body?.published !== undefined ? Boolean(request.body.published) : true
+    const displayOrder = integer(request.body, 'displayOrder', { required: false, min: 0, max: 1_000_000 }) ?? 0
+    const timestamp = now()
+    const result = db.prepare(`INSERT INTO testimonials(name,role_label,quote,image_url,published,display_order,created_at,updated_at)
+      VALUES(?,?,?,?,?,?,?,?)`).run(name, roleLabel, quote, imageUrl, published ? 1 : 0, displayOrder, timestamp, timestamp)
+    audit(request, 'create', 'testimonial', Number(result.lastInsertRowid), null, { id: Number(result.lastInsertRowid) })
+    send(response, { id: Number(result.lastInsertRowid), name, role_label: roleLabel, quote, image_url: imageUrl, published, display_order: displayOrder }, 201)
+  } catch (error) { next(error) }
+})
+app.patch('/api/testimonials/:id', requireAuth, requirePermission('testimonials.manage'), (request, response, next) => {
+  try {
+    const id = integer({ id: request.params.id }, 'id', { min: 1 })
+    const before = db.prepare('SELECT * FROM testimonials WHERE id=?').get(id)
+    if (!before) throw fail(404, 'Testimonial not found')
+    const name = request.body.name !== undefined ? value(request.body, 'name', { max: 160 }) : before.name
+    const quote = request.body.quote !== undefined ? value(request.body, 'quote', { max: 2000 }) : before.quote
+    const roleLabel = request.body.roleLabel !== undefined ? value(request.body, 'roleLabel', { required: false, max: 160 }) ?? value(request.body, 'role_label', { required: false, max: 160 }) : before.role_label
+    const imageUrl = request.body.imageUrl !== undefined ? value(request.body, 'imageUrl', { required: false, max: 500 }) ?? value(request.body, 'image_url', { required: false, max: 500 }) : before.image_url
+    const published = request.body.published !== undefined ? Boolean(request.body.published) : Boolean(before.published)
+    const displayOrder = request.body.displayOrder !== undefined ? integer(request.body, 'displayOrder', { required: false, min: 0, max: 1_000_000 }) ?? before.display_order : before.display_order
+    const timestamp = now();
+    db.prepare(`UPDATE testimonials SET name=?,role_label=?,quote=?,image_url=?,published=?,display_order=?,updated_at=? WHERE id=?`)
+      .run(name, roleLabel, quote, imageUrl, published ? 1 : 0, displayOrder, timestamp, id)
+    audit(request, 'update', 'testimonial', id, before, db.prepare('SELECT * FROM testimonials WHERE id=?').get(id))
+    send(response, { id, name, role_label: roleLabel, quote, image_url: imageUrl, published, display_order: displayOrder })
+  } catch (error) { next(error) }
+})
+app.delete('/api/testimonials/:id', requireAuth, requirePermission('testimonials.manage'), (request, response, next) => {
+  try {
+    const id = integer({ id: request.params.id }, 'id', { min: 1 })
+    const before = db.prepare('SELECT * FROM testimonials WHERE id=?').get(id)
+    if (!before) throw fail(404, 'Testimonial not found')
+    db.prepare('UPDATE testimonials SET published=0,updated_at=? WHERE id=?').run(now(), id)
+    audit(request, 'archive', 'testimonial', id, before, db.prepare('SELECT * FROM testimonials WHERE id=?').get(id))
+    send(response, { ok: true })
+  } catch (error) { next(error) }
+})
+
+app.post('/api/flagships', requireAuth, requirePermission('flagships.manage'), (request, response, next) => {
+  try {
+    const title = value(request.body, 'title', { max: 200 })
+    const description = value(request.body, 'description', { max: 5000 })
+    const imageUrl = value(request.body, 'imageUrl', { required: false, max: 500 }) ?? value(request.body, 'image_url', { required: false, max: 500 })
+    const year = integer(request.body, 'year', { required: false, min: 2000, max: 2200 }) ?? new Date().getFullYear()
+    const status = value(request.body, 'status', { required: false, max: 40 }) ?? 'published'
+    if (!['published', 'draft', 'archived'].includes(status)) throw fail(400, 'Invalid flagship status')
+    const slug = slugify(value(request.body, 'slug', { required: false, max: 200 }) ?? title)
+    const timestamp = now();
+    const result = db.prepare(`INSERT INTO flagships(title,slug,description,image_url,year,status,created_by,updated_by,created_at,updated_at)
+      VALUES(?,?,?,?,?,?,?,?,?,?)`).run(title, slug, description, imageUrl, year, status, request.user.id, request.user.id, timestamp, timestamp)
+    audit(request, 'create', 'flagship', Number(result.lastInsertRowid), null, { id: Number(result.lastInsertRowid) })
+    send(response, { id: Number(result.lastInsertRowid), title, slug, description, image_url: imageUrl, year, status }, 201)
+  } catch (error) { next(error) }
+})
+app.patch('/api/flagships/:id', requireAuth, requirePermission('flagships.manage'), (request, response, next) => {
+  try {
+    const id = integer({ id: request.params.id }, 'id', { min: 1 })
+    const before = db.prepare('SELECT * FROM flagships WHERE id=?').get(id)
+    if (!before) throw fail(404, 'Flagship not found')
+    const title = request.body.title !== undefined ? value(request.body, 'title', { max: 200 }) : before.title
+    const description = request.body.description !== undefined ? value(request.body, 'description', { max: 5000 }) : before.description
+    const imageUrl = request.body.imageUrl !== undefined ? value(request.body, 'imageUrl', { required: false, max: 500 }) ?? value(request.body, 'image_url', { required: false, max: 500 }) : before.image_url
+    const year = request.body.year !== undefined ? integer(request.body, 'year', { required: false, min: 2000, max: 2200 }) ?? before.year : before.year
+    const status = request.body.status !== undefined ? value(request.body, 'status', { required: false, max: 40 }) : before.status
+    if (status && !['published', 'draft', 'archived'].includes(status)) throw fail(400, 'Invalid flagship status')
+    const slug = request.body.slug !== undefined ? slugify(value(request.body, 'slug', { required: false, max: 200 }) ?? title) : before.slug
+    const timestamp = now();
+    db.prepare(`UPDATE flagships SET title=?,slug=?,description=?,image_url=?,year=?,status=?,updated_by=?,updated_at=? WHERE id=?`)
+      .run(title, slug, description, imageUrl, year, status, request.user.id, timestamp, id)
+    audit(request, 'update', 'flagship', id, before, db.prepare('SELECT * FROM flagships WHERE id=?').get(id))
+    send(response, { id, title, slug, description, image_url: imageUrl, year, status })
+  } catch (error) { next(error) }
+})
+app.delete('/api/flagships/:id', requireAuth, requirePermission('flagships.manage'), (request, response, next) => {
+  try {
+    const id = integer({ id: request.params.id }, 'id', { min: 1 })
+    const before = db.prepare('SELECT * FROM flagships WHERE id=?').get(id)
+    if (!before) throw fail(404, 'Flagship not found')
+    db.prepare('UPDATE flagships SET status="archived",updated_by=?,updated_at=? WHERE id=?').run(request.user.id, now(), id)
+    audit(request, 'archive', 'flagship', id, before, db.prepare('SELECT * FROM flagships WHERE id=?').get(id))
+    send(response, { ok: true })
+  } catch (error) { next(error) }
+})
+
+app.post('/api/team', requireAuth, requirePermission('team.manage'), (request, response, next) => {
+  try {
+    const userId = integer(request.body, 'userId', { required: false, min: 1 }) ?? null
+    const nameOverride = value(request.body, 'nameOverride', { required: false, max: 160 }) ?? value(request.body, 'name_override', { required: false, max: 160 })
+    const roleTitle = value(request.body, 'roleTitle', { max: 160 }) ?? value(request.body, 'role_title', { max: 160 })
+    const imageUrl = value(request.body, 'imageUrl', { required: false, max: 500 }) ?? value(request.body, 'image_url', { required: false, max: 500 })
+    const linkedinUrl = value(request.body, 'linkedinUrl', { required: false, max: 500 }) ?? value(request.body, 'linkedin_url', { required: false, max: 500 })
+    const quote = value(request.body, 'quote', { required: false, max: 2000 })
+    const displayOrder = integer(request.body, 'displayOrder', { required: false, min: 0, max: 1_000_000 }) ?? 0
+    const published = request.body?.published !== undefined ? Boolean(request.body.published) : true
+    if (userId && !db.prepare('SELECT 1 FROM users WHERE id=?').get(userId)) throw fail(404, 'User not found')
+    const result = db.prepare(`INSERT INTO team_profiles(user_id,name_override,role_title,image_url,linkedin_url,quote,display_order,published)
+      VALUES(?,?,?,?,?,?,?,?)`).run(userId, nameOverride, roleTitle, imageUrl, linkedinUrl, quote, displayOrder, published ? 1 : 0)
+    audit(request, 'create', 'team_profile', Number(result.lastInsertRowid), null, { id: Number(result.lastInsertRowid) })
+    send(response, { id: Number(result.lastInsertRowid), user_id: userId, name_override: nameOverride, role_title: roleTitle, image_url: imageUrl, linkedin_url: linkedinUrl, quote, display_order: displayOrder, published }, 201)
+  } catch (error) { next(error) }
+})
+app.patch('/api/team/:id', requireAuth, requirePermission('team.manage'), (request, response, next) => {
+  try {
+    const id = integer({ id: request.params.id }, 'id', { min: 1 })
+    const before = db.prepare('SELECT * FROM team_profiles WHERE id=?').get(id)
+    if (!before) throw fail(404, 'Team profile not found')
+    const userId = request.body.userId !== undefined ? integer(request.body, 'userId', { required: false, min: 1 }) ?? null : before.user_id
+    const nameOverride = request.body.nameOverride !== undefined ? (value(request.body, 'nameOverride', { required: false, max: 160 }) ?? value(request.body, 'name_override', { required: false, max: 160 })) : before.name_override
+    const roleTitle = request.body.roleTitle !== undefined ? (value(request.body, 'roleTitle', { max: 160 }) ?? value(request.body, 'role_title', { max: 160 })) : before.role_title
+    const imageUrl = request.body.imageUrl !== undefined ? (value(request.body, 'imageUrl', { required: false, max: 500 }) ?? value(request.body, 'image_url', { required: false, max: 500 })) : before.image_url
+    const linkedinUrl = request.body.linkedinUrl !== undefined ? (value(request.body, 'linkedinUrl', { required: false, max: 500 }) ?? value(request.body, 'linkedin_url', { required: false, max: 500 })) : before.linkedin_url
+    const quote = request.body.quote !== undefined ? value(request.body, 'quote', { required: false, max: 2000 }) : before.quote
+    const displayOrder = request.body.displayOrder !== undefined ? integer(request.body, 'displayOrder', { required: false, min: 0, max: 1_000_000 }) ?? before.display_order : before.display_order
+    const published = request.body.published !== undefined ? Boolean(request.body.published) : Boolean(before.published)
+    if (userId && !db.prepare('SELECT 1 FROM users WHERE id=?').get(userId)) throw fail(404, 'User not found')
+    db.prepare(`UPDATE team_profiles SET user_id=?,name_override=?,role_title=?,image_url=?,linkedin_url=?,quote=?,display_order=?,published=? WHERE id=?`)
+      .run(userId, nameOverride, roleTitle, imageUrl, linkedinUrl, quote, displayOrder, published ? 1 : 0, id)
+    audit(request, 'update', 'team_profile', id, before, db.prepare('SELECT * FROM team_profiles WHERE id=?').get(id))
+    send(response, { id, user_id: userId, name_override: nameOverride, role_title: roleTitle, image_url: imageUrl, linkedin_url: linkedinUrl, quote, display_order: displayOrder, published })
+  } catch (error) { next(error) }
+})
+app.delete('/api/team/:id', requireAuth, requirePermission('team.manage'), (request, response, next) => {
+  try {
+    const id = integer({ id: request.params.id }, 'id', { min: 1 })
+    const before = db.prepare('SELECT * FROM team_profiles WHERE id=?').get(id)
+    if (!before) throw fail(404, 'Team profile not found')
+    db.prepare('UPDATE team_profiles SET published=0 WHERE id=?').run(id)
+    audit(request, 'archive', 'team_profile', id, before, db.prepare('SELECT * FROM team_profiles WHERE id=?').get(id))
+    send(response, { ok: true })
+  } catch (error) { next(error) }
+})
+
+app.get('/api/challenges/manage', requireAuth, requirePermission('challenges.manage'), (request, response, next) => {
+  try {
+    send(response, db.prepare(`SELECT id,title,slug,category,difficulty,points,description,status,created_by,created_at,updated_at
+      FROM challenges ORDER BY created_at DESC`).all())
+  } catch (error) { next(error) }
+})
+app.post('/api/challenges', requireAuth, requirePermission('challenges.manage'), (request, response, next) => {
+  try {
+    const title = value(request.body, 'title', { max: 200 })
+    const slug = slugify(value(request.body, 'slug', { required: false, max: 200 }) ?? title)
+    const category = value(request.body, 'category', { max: 80 })
+    const difficulty = value(request.body, 'difficulty', { max: 40 })
+    const points = integer(request.body, 'points', { min: 0, max: 1000000 })
+    const description = value(request.body, 'description', { max: 5000 })
+    const flag = value(request.body, 'flag', { max: 500 })
+    const status = value(request.body, 'status', { required: false, max: 20 }) ?? 'published'
+    if (!['draft', 'published', 'archived'].includes(status)) throw fail(400, 'Invalid challenge status')
+    const timestamp = now();
+    const result = db.prepare(`INSERT INTO challenges(title,slug,category,difficulty,points,description,flag_hash,status,created_by,created_at,updated_at)
+      VALUES(?,?,?,?,?,?,?,?,?,?,?)`).run(title, slug, category, difficulty, points, description, sha256(flag), status, request.user.id, timestamp, timestamp)
+    audit(request, 'create', 'challenge', Number(result.lastInsertRowid), null, { id: Number(result.lastInsertRowid) })
+    send(response, { id: Number(result.lastInsertRowid), title, slug, category, difficulty, points, description, status }, 201)
+  } catch (error) { next(error) }
+})
+app.patch('/api/challenges/:id', requireAuth, requirePermission('challenges.manage'), (request, response, next) => {
+  try {
+    const id = integer({ id: request.params.id }, 'id', { min: 1 })
+    const before = db.prepare('SELECT * FROM challenges WHERE id=?').get(id)
+    if (!before) throw fail(404, 'Challenge not found')
+    const title = request.body.title !== undefined ? value(request.body, 'title', { max: 200 }) : before.title
+    const slug = request.body.slug !== undefined ? slugify(value(request.body, 'slug', { required: false, max: 200 }) ?? title) : before.slug
+    const category = request.body.category !== undefined ? value(request.body, 'category', { max: 80 }) : before.category
+    const difficulty = request.body.difficulty !== undefined ? value(request.body, 'difficulty', { max: 40 }) : before.difficulty
+    const points = request.body.points !== undefined ? integer(request.body, 'points', { min: 0, max: 1000000 }) : before.points
+    const description = request.body.description !== undefined ? value(request.body, 'description', { max: 5000 }) : before.description
+    const status = request.body.status !== undefined ? value(request.body, 'status', { required: false, max: 20 }) : before.status
+    if (status && !['draft', 'published', 'archived'].includes(status)) throw fail(400, 'Invalid challenge status')
+    const flag = request.body.flag !== undefined ? value(request.body, 'flag', { max: 500 }) : null
+    const timestamp = now();
+    db.prepare(`UPDATE challenges SET title=?,slug=?,category=?,difficulty=?,points=?,description=?,${flag ? 'flag_hash=?,':''}status=?,updated_at=? WHERE id=?`)
+      .run(...([title, slug, category, difficulty, points, description].concat(flag ? [sha256(flag)] : []).concat([status, timestamp, id])))
+    audit(request, 'update', 'challenge', id, before, db.prepare('SELECT * FROM challenges WHERE id=?').get(id))
+    send(response, { id, title, slug, category, difficulty, points, description, status })
+  } catch (error) { next(error) }
+})
+app.delete('/api/challenges/:id', requireAuth, requirePermission('challenges.manage'), (request, response, next) => {
+  try {
+    const id = integer({ id: request.params.id }, 'id', { min: 1 })
+    const before = db.prepare('SELECT * FROM challenges WHERE id=?').get(id)
+    if (!before) throw fail(404, 'Challenge not found')
+    db.prepare('UPDATE challenges SET status="archived",updated_at=? WHERE id=?').run(now(), id)
+    audit(request, 'archive', 'challenge', id, before, db.prepare('SELECT * FROM challenges WHERE id=?').get(id))
+    send(response, { ok: true })
+  } catch (error) { next(error) }
+})
+
+app.patch('/api/site-settings/:key', requireAuth, requirePermission('site_settings.manage'), (request, response, next) => {
+  try {
+    const key = value(request.params, 'key', { max: 100 })
+    const valueToSave = request.body?.value
+    if (valueToSave === undefined) throw fail(400, 'value is required')
+    const timestamp = now();
+    db.prepare('INSERT INTO site_settings(key,value_json,updated_by,updated_at) VALUES(?,?,?,?) ON CONFLICT(key) DO UPDATE SET value_json=excluded.value_json,updated_by=excluded.updated_by,updated_at=excluded.updated_at')
+      .run(key, JSON.stringify(valueToSave), request.user.id, timestamp)
+    audit(request, 'update', 'site_setting', key, null, { key, value: valueToSave })
+    send(response, { key, value: valueToSave })
+  } catch (error) { next(error) }
+})
+
+app.get('/api/admin/contact-messages', requireAuth, requirePermission('contact.manage'), (request, response, next) => {
+  try {
+    send(response, db.prepare(`SELECT c.*,u.display_name AS assigned_name FROM contact_messages c LEFT JOIN users u ON u.id=c.assigned_to ORDER BY c.created_at DESC`).all())
+  } catch (error) { next(error) }
+})
+app.patch('/api/admin/contact-messages/:id', requireAuth, requirePermission('contact.manage'), (request, response, next) => {
+  try {
+    const id = integer({ id: request.params.id }, 'id', { min: 1 })
+    const before = db.prepare('SELECT * FROM contact_messages WHERE id=?').get(id)
+    if (!before) throw fail(404, 'Contact message not found')
+    const status = request.body.status !== undefined ? value(request.body, 'status', { max: 40 }) : before.status
+    if (status && !['new', 'in_progress', 'resolved', 'spam'].includes(status)) throw fail(400, 'Invalid contact status')
+    const assignedTo = request.body.assignedTo !== undefined ? integer(request.body, 'assignedTo', { required: false, min: 1 }) : before.assigned_to
+    if (assignedTo && !db.prepare('SELECT 1 FROM users WHERE id=?').get(assignedTo)) throw fail(404, 'Assigned user not found')
+    const resolvedAt = status === 'resolved' && !before.resolved_at ? now() : before.resolved_at
+    db.prepare('UPDATE contact_messages SET status=?,assigned_to=?,resolved_at=? WHERE id=?').run(status, assignedTo ?? null, resolvedAt, id)
+    audit(request, 'triage', 'contact_message', id, before, db.prepare('SELECT * FROM contact_messages WHERE id=?').get(id))
+    send(response, { id, status, assigned_to: assignedTo ?? null, resolved_at: resolvedAt })
+  } catch (error) { next(error) }
+})
+
+app.get('/api/admin/memberships/pending-payment', requireAuth, requirePermission('membership.payment'), (request, response, next) => {
+  try {
+    send(response, db.prepare(`SELECT m.id,m.user_id,m.application_id,m.status,m.starts_at,m.expires_at,p.name AS plan_name,p.fee_paise,p.currency,
+      u.email,u.display_name
+      FROM memberships m JOIN membership_plans p ON p.id=m.plan_id JOIN users u ON u.id=m.user_id
+      WHERE m.status='pending_payment' ORDER BY m.created_at DESC`).all())
+  } catch (error) { next(error) }
+})
+
 app.post('/api/contact-messages', (request, response, next) => {
   try {
     const name = value(request.body, 'name', { max: 160 }); const address = email(request.body); const message = value(request.body, 'message', { max: 5000 })
@@ -483,7 +779,11 @@ app.post('/api/admin/membership-applications/:id/approve', requireAuth, requireR
       const plan = db.prepare('SELECT id FROM membership_plans WHERE active=1 ORDER BY id LIMIT 1').get()
       const membership = db.prepare('SELECT id FROM memberships WHERE application_id=?').get(id)
       const membershipId = membership?.id ?? Number(db.prepare(`INSERT INTO memberships(user_id,application_id,plan_id,status,created_at,updated_at) VALUES(?,?,?,?,?,?)`).run(user.id, id, plan.id, 'pending_payment', timestamp, timestamp).lastInsertRowid)
-      return { userId: user.id, membershipId, applicationId: id }
+      const activationToken = randomBytes(32).toString('base64url')
+      db.prepare(`INSERT INTO activation_tokens(id,user_id,token_hash,expires_at,created_at)
+        VALUES(?,?,?,?,?)`).run(randomBytes(16).toString('hex'), user.id, hashToken(activationToken),
+        new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(), timestamp)
+      return { userId: user.id, membershipId, applicationId: id, activationToken }
     })
     audit(request, 'approve', 'membership_application', id, null, result); send(response, result)
   } catch (error) { next(error) }

@@ -1,10 +1,14 @@
 import { useEffect, useRef, useState, type PointerEvent } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { logout } from '../../api/client'
 import type { AppRoute } from '../../app/routes'
+import type { AuthSession } from '../../types'
 import DraggablePanel from './DraggablePanel'
 
 interface DesktopWorkspaceProps {
   routes: AppRoute[]
+  session: AuthSession
+  onSessionChange: (session: AuthSession) => void
 }
 
 interface Panel {
@@ -85,7 +89,7 @@ function arrangePanels(panels: Panel[], left: number, surfaceWidth: number, surf
   })
 }
 
-function DesktopWorkspace({ routes }: DesktopWorkspaceProps) {
+function DesktopWorkspace({ routes, session, onSessionChange }: DesktopWorkspaceProps) {
   const location = useLocation()
   const navigate = useNavigate()
   const initialPath = routes.some((route) => route.path === location.pathname) ? location.pathname : (routes[0]?.path ?? '/')
@@ -93,6 +97,7 @@ function DesktopWorkspace({ routes }: DesktopWorkspaceProps) {
   const [panels, setPanels] = useState<Record<string, Panel>>({})
   const [surfaceSize, setSurfaceSize] = useState<SurfaceSize>({ width: 0, height: 0 })
   const [activePaneWidth, setActivePaneWidth] = useState(0)
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false)
   const gestureRef = useRef<HeaderGesture | null>(null)
   const surfaceRef = useRef<HTMLDivElement>(null)
   const paneResizeRef = useRef<{ pointerId: number; startX: number; startWidth: number } | null>(null)
@@ -100,6 +105,11 @@ function DesktopWorkspace({ routes }: DesktopWorkspaceProps) {
 
   const activePath = routes.some((route) => route.path === location.pathname) ? location.pathname : selectedPath
   const activeRoute = routes.find((route) => route.path === activePath) ?? routes[0]
+  const navigationRoutes = routes.filter((route) => !['/login', '/register', '/activate', '/profile'].includes(route.path))
+
+  useEffect(() => {
+    setAccountMenuOpen(false)
+  }, [location.pathname])
 
   useEffect(() => {
     activePaneWidthRef.current = activePaneWidth
@@ -213,6 +223,38 @@ function DesktopWorkspace({ routes }: DesktopWorkspaceProps) {
     }
   }
 
+  const handleAccountAction = (path: string) => {
+    setSelectedPath(path)
+    setAccountMenuOpen(false)
+    navigate(path)
+  }
+
+  const handleLogoutClick = async () => {
+    setAccountMenuOpen(false)
+    try {
+      await logout()
+    } finally {
+      onSessionChange({
+        authenticated: false,
+        role: 'visitor',
+        user: null,
+        permissions: [],
+        positions: [],
+      })
+      navigate('/')
+    }
+  }
+
+  const accountActions = session.authenticated
+    ? [
+        { label: 'Profile', action: () => handleAccountAction('/profile') },
+        { label: 'Log out', action: handleLogoutClick },
+      ]
+    : [
+        { label: 'Log in', action: () => handleAccountAction('/login') },
+        { label: 'Register', action: () => handleAccountAction('/register') },
+      ]
+
   return (
     <section
       className={`desktop-workspace ${Object.keys(panels).length ? 'split-view' : ''}`}
@@ -223,7 +265,7 @@ function DesktopWorkspace({ routes }: DesktopWorkspaceProps) {
         <div className="navbar">
           <div className="brand">Security Club</div>
           <nav className="nav-links desktop-page-links" aria-label="Page headers">
-            {routes.map((route) => (
+            {navigationRoutes.map((route) => (
               <button
                 key={route.path}
                 type="button"
@@ -236,6 +278,35 @@ function DesktopWorkspace({ routes }: DesktopWorkspaceProps) {
                 {route.label}
               </button>
             ))}
+
+            <div className="account-menu-wrap">
+              <button
+                type="button"
+                className="account-trigger"
+                aria-label={session.authenticated ? 'Open account menu' : 'Open authentication menu'}
+                aria-expanded={accountMenuOpen}
+                onClick={() => setAccountMenuOpen((current) => !current)}
+              >
+                <span className="account-avatar" aria-hidden="true">{(session.user?.displayName ?? 'A').charAt(0).toUpperCase()}</span>
+                <span className="account-caret" aria-hidden="true">▾</span>
+              </button>
+
+              {accountMenuOpen ? (
+                <div className="account-menu" role="menu" aria-label="Account menu">
+                  {accountActions.map((item) => (
+                    <button
+                      key={item.label}
+                      type="button"
+                      className="account-menu-item"
+                      onClick={item.action}
+                      role="menuitem"
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
           </nav>
         </div>
       </header>
