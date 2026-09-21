@@ -1,11 +1,15 @@
-import type { PropsWithChildren } from 'react'
+import type { ReactNode } from 'react'
 
-interface DraggableWorkspaceProps extends PropsWithChildren {
+interface DraggableWorkspaceProps {
   pageKey: string
+  children: ReactNode
 }
 
-function DraggableWorkspace({ children }: DraggableWorkspaceProps) {
-  return <div className="page">{children}</div>
+function DraggableWorkspace({ pageKey, children }: DraggableWorkspaceProps) {
+  void pageKey
+  return (
+    <div className="page">{children}</div>
+  )
 }
 
 export default DraggableWorkspace
