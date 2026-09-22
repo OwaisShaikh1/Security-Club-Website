@@ -4,7 +4,6 @@ import {
   db, hashPassword, verifyPassword, hashToken, sha256, slugify, now, transaction,
 } from './db.js'
 import { roles } from './access.js'
-import { timingSafeEqual } from 'node:crypto'
 
 const app = express()
 const port = Number(process.env.PORT ?? 3001)
@@ -203,38 +202,6 @@ app.get('/api/auth/me', (request, response) => send(response, {
   } : null, permissions: request.user?.permissions ?? permissionKeys('visitor'),
   positions: request.user?.positions ?? [],
 }))
-app.post('/api/auth/register', (request, response, next) => {
-  try {
-    const address = email(request.body)
-    const password = value(request.body, 'password', { max: 200 })
-    if (password.length < 8) throw fail(400, 'password must be at least 8 characters')
-    const displayName = value(request.body, 'displayName', { max: 160 })
-    const requestedRole = request.body.role ?? 'visitor'
-    if (!roles.includes(requestedRole) || requestedRole === 'visitor') {
-      request.body.role = 'visitor'
-    } else if (requestedRole !== 'admin') {
-      throw fail(403, 'Only visitor or admin accounts can be registered')
-    } else {
-      const configuredKey = process.env.ADMIN_REGISTRATION_KEY
-      const submittedKey = value(request.body, 'adminKey', { max: 200 })
-      if (!configuredKey || configuredKey.length !== submittedKey.length ||
-        !timingSafeEqual(Buffer.from(configuredKey), Buffer.from(submittedKey))) {
-        throw fail(403, 'Invalid admin registration key')
-      }
-    }
-    if (db.prepare('SELECT 1 FROM users WHERE email=?').get(address)) throw fail(409, 'An account with that email already exists')
-    const roleId = db.prepare('SELECT id FROM roles WHERE key=?').get(requestedRole).id
-    const userId = transaction(() => {
-      const timestamp = now()
-      const result = db.prepare(`INSERT INTO users(email,password_hash,display_name,role_id,status,created_at,updated_at)
-        VALUES(?,?,?,?,?,?,?)`).run(address, hashPassword(password), displayName, roleId, 'active', timestamp, timestamp)
-      return Number(result.lastInsertRowid)
-    })
-    const token = createSession(userId)
-    setSessionCookie(response, token)
-    send(response, { user: { id: userId, email: address, displayName, role: requestedRole } }, 201)
-  } catch (error) { next(error) }
-})
 app.post('/api/auth/login', (request, response, next) => {
   try {
     const address = email(request.body)

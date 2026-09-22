@@ -6,9 +6,8 @@ interface DraggableWorkspaceProps {
 }
 
 function DraggableWorkspace({ pageKey, children }: DraggableWorkspaceProps) {
-  void pageKey
   return (
-    <div className="page">{children}</div>
+    <div className={`page ${pageKey}-page`}>{children}</div>
   )
 }
 

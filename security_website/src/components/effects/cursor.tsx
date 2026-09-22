@@ -30,7 +30,7 @@ const TargetCursor: React.FC<TargetCursorProps> = ({
     if (typeof window === 'undefined') return false;
     const hasTouchScreen = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
     const isSmallScreen = window.innerWidth <= 768;
-    const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
+    const userAgent = navigator.userAgent || navigator.vendor || '';
     const mobileRegex = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i;
     const isMobileUserAgent = mobileRegex.test(userAgent.toLowerCase());
     return (hasTouchScreen && isSmallScreen) || isMobileUserAgent;
@@ -246,6 +246,7 @@ const TargetCursor: React.FC<TargetCursorProps> = ({
 
     window.addEventListener('mouseover', enterHandler as EventListener);
 
+    const activeStrength = activeStrengthRef.current;
     return () => {
       if (tickerFnRef.current) {
         gsap.ticker.remove(tickerFnRef.current);
@@ -262,7 +263,7 @@ const TargetCursor: React.FC<TargetCursorProps> = ({
       document.body.style.cursor = originalCursor;
       isActiveRef.current = false;
       targetCornerPositionsRef.current = null;
-      activeStrengthRef.current.current = 0;
+      activeStrength.current = 0;
     };
   }, [targetSelector, spinDuration, moveCursor, constants, hideDefaultCursor, isMobile, hoverDuration, parallaxOn]);
 

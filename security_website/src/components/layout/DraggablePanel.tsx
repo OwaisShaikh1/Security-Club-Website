@@ -92,10 +92,6 @@ function DraggablePanel({
   const lastPanelSizeRef = useRef<{ width: number; height: number } | null>(null)
   const [resizing, setResizing] = useState(false)
 
-  useEffect(() => {
-    setPosition({ x: initialX, y: initialY })
-  }, [initialX, initialY])
-
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
     const panelRect = panelRef.current?.getBoundingClientRect()
     if (!panelRect) return
@@ -150,7 +146,7 @@ function DraggablePanel({
       window.removeEventListener('pointermove', handleWindowPointerMove)
       window.removeEventListener('pointerup', handleWindowPointerUp)
     }
-  }, [dragging])
+  }, [dragging, onDragStateChange, onPositionChange])
 
   useEffect(() => {
     const node = contentRef.current

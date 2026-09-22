@@ -1,5 +1,9 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from 'react'
-import type { AppRoute } from '../../app/routes'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent, type ReactNode } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
+import { canAccessRoute, type AppRoute } from '../../app/routes'
+import { getAuthSession, logout } from '../../api/client'
+import type { AuthSession } from '../../types'
+import AccessDeniedPage from '../../pages/AccessDeniedPage'
 import DraggablePanel from './DraggablePanel'
 
 interface DesktopWorkspaceProps {
@@ -152,8 +156,9 @@ function fitPanelsToHostBoundary(
   panels: OpenPanel[],
   boundary: number,
   surfaceWidth: number,
-  _surfaceHeight: number,
+  surfaceHeight: number,
 ) {
+  void surfaceHeight
   const gap = 14
   const rightEdge = Math.max(boundary + 1, surfaceWidth - 12)
   const placed: OpenPanel[] = []
@@ -295,15 +300,38 @@ function fitPanelsToHostBoundary(
   return placed
 }
 
+function RouteContent({ route, requestedPath, session, loading }: {
+  route?: AppRoute
+  requestedPath: string
+  session: AuthSession | null
+  loading: boolean
+}): ReactNode {
+  if (!route) {
+    return <div className="page"><section className="auth-page"><div className="card auth-card"><h2>Page not found</h2><p className="muted">No page exists at <strong>{requestedPath}</strong>.</p></div></section></div>
+  }
+
+  const requiresAccess = route.requiredRole !== 'visitor' || Boolean(route.requiredPermission) || Boolean(route.requiredPosition) || Boolean(route.anonymousOnly)
+  if (requiresAccess && loading) {
+    return <div className="page"><section className="auth-page"><div className="card auth-card"><p className="muted">Checking access…</p></div></section></div>
+  }
+
+  if (requiresAccess && !canAccessRoute(route, session)) {
+    return <AccessDeniedPage requestedPath={requestedPath} />
+  }
+
+  return route.element
+}
+
 function DesktopWorkspace({ routes }: DesktopWorkspaceProps) {
+  const location = useLocation()
+  const navigate = useNavigate()
   const routeMap = useMemo(
     () => new Map(routes.map((route) => [route.path, route])),
     [routes],
   )
 
-  const [activePath, setActivePath] = useState<string>(
-    () => routes[0]?.path ?? '/',
-  )
+  const [session, setSession] = useState<AuthSession | null>(null)
+  const [sessionLoading, setSessionLoading] = useState(true)
 
   const [activePaneWidth, setActivePaneWidth] = useState<number | null>(null)
   const [openPanels, setOpenPanels] = useState<OpenPanel[]>([])
@@ -324,6 +352,24 @@ function DesktopWorkspace({ routes }: DesktopWorkspaceProps) {
 
   const isAnyPanelResizingRef = useRef(false)
   const isAnyPanelDraggingRef = useRef(false)
+
+  useEffect(() => {
+    let active = true
+    getAuthSession()
+      .then((nextSession) => {
+        if (active) setSession(nextSession)
+      })
+      .catch(() => {
+        if (active) setSession(null)
+      })
+      .finally(() => {
+        if (active) setSessionLoading(false)
+      })
+
+    return () => {
+      active = false
+    }
+  }, [location.pathname])
 
   useEffect(() => {
     const handlePointerMove = (event: globalThis.PointerEvent) => {
@@ -582,7 +628,7 @@ function DesktopWorkspace({ routes }: DesktopWorkspaceProps) {
 
     if (state?.pointerId === event.pointerId) {
       if (!state.opened) {
-        setActivePath(state.path)
+        navigate(state.path)
       }
 
       dragStateRef.current = null
@@ -636,7 +682,12 @@ function DesktopWorkspace({ routes }: DesktopWorkspaceProps) {
     node.scrollLeft = fullPageScrollRef.current.left
   })
 
-  const activeRoute = routeMap.get(activePath)
+  const activeRoute = routeMap.get(location.pathname)
+  const visibleRoutes = routes.filter((route) => route.showInNavigation && canAccessRoute(route, session))
+
+  const handleHeaderLogout = async () => {
+    try { await logout() } finally { setSession(null); navigate('/') }
+  }
 
   return (
     <section
@@ -658,18 +709,19 @@ function DesktopWorkspace({ routes }: DesktopWorkspaceProps) {
       <header className="navbar-wrap desktop-header-strip">
         <div className="navbar">
           <div className="brand">
-            Security Club
+            <svg className="brand-mark" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 20 5v6c0 5-3.2 8.8-8 11-4.8-2.2-8-6-8-11V5l8-3Z" /><path d="m8.5 12 2.2 2.2 4.8-5" /></svg>
+            <span>Security Club</span>
           </div>
 
           <nav
             className="nav-links desktop-page-links"
             aria-label="Page headers"
           >
-            {routes.map((route) => (
+            {visibleRoutes.map((route) => (
               <button
                 key={route.path}
                 type="button"
-                className="nav-link desktop-header-button"
+                className={`nav-link desktop-header-button ${location.pathname === route.path ? 'active' : ''}`.trim()}
                 onPointerDown={(event) =>
                   handleHeaderPointerDown(
                     event,
@@ -687,6 +739,12 @@ function DesktopWorkspace({ routes }: DesktopWorkspaceProps) {
               </button>
             ))}
           </nav>
+          <div className="account-actions" aria-label="Account controls">
+            {session?.authenticated ? <>
+              <button type="button" className="account-action" onClick={() => navigate('/profile')} title="Open profile" aria-label="Open profile"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 21a8 8 0 0 0-16 0M12 13a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z" /></svg><span>Profile</span></button>
+              <button type="button" className="account-action" onClick={handleHeaderLogout} title="Log out" aria-label="Log out"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 17l5-5-5-5M15 12H3M21 3v18" /></svg><span>Log out</span></button>
+            </> : <button type="button" className="account-action" onClick={() => navigate('/auth')} title="Log in" aria-label="Log in"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h7a2 2 0 0 0 2-2v-3M10 12h11M17 8l4 4-4 4" /></svg><span>Log in</span></button>}
+          </div>
         </div>
       </header>
 
@@ -704,7 +762,7 @@ function DesktopWorkspace({ routes }: DesktopWorkspaceProps) {
             }
           }}
         >
-          {activeRoute?.element}
+          <RouteContent route={activeRoute} requestedPath={location.pathname} session={session} loading={sessionLoading} />
         </div>
 
         {openPanels.length > 0 ? (
@@ -914,7 +972,7 @@ function DesktopWorkspace({ routes }: DesktopWorkspaceProps) {
                 }
               }
             >
-              {route.element}
+              <RouteContent route={route} requestedPath={panel.path} session={session} loading={sessionLoading} />
             </DraggablePanel>
           )
         })}

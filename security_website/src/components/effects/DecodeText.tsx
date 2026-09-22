@@ -40,7 +40,7 @@ const DecodeText: React.FC<DecodeTextProps> = ({ text, delay = 0.1, className = 
     return () => clearTimeout(timer);
   }, [text, delay]);
 
-  return <span className={className}>{displayText || text.split('').map(() => chars[Math.floor(Math.random() * chars.length)]).join('')}</span>;
+  return <span className={className}>{displayText || text}</span>;
 };
 
 export default DecodeText;

@@ -1,5 +1,6 @@
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { logout } from '../../api/client'
+import { getAuthSession, logout } from '../../api/client'
 import SectionHeader from '../../components/common/SectionHeader'
 import DraggableWorkspace from '../../components/layout/DraggableWorkspace'
 import type { AuthSession } from '../../types'
@@ -11,19 +12,15 @@ interface ProfilePageProps {
 
 function ProfilePage({ session, onSessionChange }: ProfilePageProps) {
   const navigate = useNavigate()
+  const [loadedSession, setLoadedSession] = useState<AuthSession | null>(session ?? null)
 
-  const currentSession = session ?? {
-    authenticated: true,
-    role: 'member',
-    user: {
-      id: 0,
-      email: 'member@security-club.dev',
-      displayName: 'Member',
-      role: 'member',
-    },
-    permissions: [],
-    positions: [],
-  }
+  useEffect(() => {
+    if (session) return
+    getAuthSession().then(setLoadedSession).catch(() => navigate('/'))
+  }, [session, navigate])
+
+  const currentSession = session ?? loadedSession
+  if (!currentSession) return <DraggableWorkspace pageKey="profile"><section className="auth-page"><div className="card auth-card"><p className="muted">Loading profile…</p></div></section></DraggableWorkspace>
 
   const handleLogout = async () => {
     try {

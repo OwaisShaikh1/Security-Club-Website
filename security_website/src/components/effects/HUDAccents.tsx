@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 const HUDAccents: React.FC = () => {
+  const [tracingId] = useState(() => crypto.randomUUID().replaceAll('-', '').slice(0, 8).toUpperCase());
   return (
     <div className="hud-layer" style={{
       position: 'fixed',
@@ -31,7 +32,7 @@ const HUDAccents: React.FC = () => {
 
       {/* Bottom Right */}
       <div style={{ position: 'absolute', bottom: '20px', right: '20px', textAlign: 'right' }}>
-        TRACING_ID: {Math.random().toString(16).slice(2, 10).toUpperCase()}
+        TRACING_ID: {tracingId}
       </div>
     </div>
   );

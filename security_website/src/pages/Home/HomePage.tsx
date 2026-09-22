@@ -14,14 +14,41 @@ function HomePage() {
   return (
     <DraggableWorkspace pageKey="home">
       <section className="hero-panel">
-        <p className="eyebrow">Security Club DBIT</p>
-        <h1><DecodeText text="Hack. Defend. Secure." /></h1>
-        <p className="hero-copy">
-          Hands-on cybersecurity community for workshops, CTFs, research, and real-world defense skills.
-        </p>
-        <div className="actions">
-          <Link to="/events"><Button>Explore Events</Button></Link>
-          <Link to="/membership"><Button variant="outline">Join Now</Button></Link>
+        <div className="hero-content">
+          <p className="eyebrow">Security Club DBIT</p>
+
+          <h1>
+            <DecodeText text="Hack. Defend. Secure." />
+          </h1>
+
+          <p className="hero-copy">
+            Hands-on cybersecurity community for workshops, CTFs, research,
+            and real-world defense skills.
+          </p>
+
+          <div className="actions">
+            <Link to="/events">
+              <Button>Explore Events</Button>
+            </Link>
+
+            <Link to="/membership">
+              <Button variant="outline">Join Now</Button>
+            </Link>
+          </div>
+        </div>
+
+        <div className="landing-signal" aria-hidden="true">
+          <div className="signal-orbit orbit-one" />
+          <div className="signal-orbit orbit-two" />
+
+          <div className="signal-core">
+            <span>SC</span>
+            <small>SECURE</small>
+          </div>
+
+          <span className="signal-label label-one">LEARN</span>
+          <span className="signal-label label-two">DEFEND</span>
+          <span className="signal-label label-three">CONNECT</span>
         </div>
       </section>
 
