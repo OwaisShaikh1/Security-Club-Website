@@ -1467,6 +1467,33 @@ main {
   animation: none;
 }
 
+.card-poster {
+  margin: -1.1rem -1.1rem 1rem -1.1rem;
+  overflow: hidden;
+  border-bottom: 1px solid #1b3342;
+  max-height: 220px;
+}
+
+.card-poster img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top;
+  display: block;
+  transition: transform 300ms ease;
+}
+
+.card:hover .card-poster img {
+  transform: scale(1.04);
+}
+
+.card-venue {
+  font-size: 0.78rem;
+  color: #6a9ab8;
+  margin: 0.15rem 0 0.4rem;
+}
+
+
 /* =========================================================
    BADGES / TAGS
    ========================================================= */

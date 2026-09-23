@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import type { NavItem } from '../../app/routes'
+import logo from '../../assets/data/Security Club Logo.png'
 
 interface NavbarProps {
   links: NavItem[]
@@ -13,6 +14,7 @@ function Navbar({ links }: NavbarProps) {
     <header className="navbar-wrap">
       <div className="container navbar">
         <NavLink to="/" className="brand" onClick={() => setOpen(false)}>
+          <img src={logo} alt="Security Club Logo" style={{ height: '32px', marginRight: '8px', objectFit: 'contain' }} />
           Security Club
         </NavLink>
 

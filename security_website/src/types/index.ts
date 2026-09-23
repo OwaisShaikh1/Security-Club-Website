@@ -1,5 +1,5 @@
 export type UserRole = 'admin' | 'core' | 'member' | 'visitor'
-export type EventType = 'workshop' | 'ctf' | 'seminar'
+export type EventType = 'workshop' | 'ctf' | 'seminar' | 'inauguration' | 'bootcamp'
 export type EventStatus = 'draft' | 'published' | 'cancelled' | 'completed'
 
 export interface EventItem {
@@ -9,6 +9,7 @@ export interface EventItem {
   type: EventType
   description: string
   tags: string[]
+  poster?: string
   slug?: string
   summary?: string
   venue?: string | null

@@ -1,0 +1,79 @@
+.security-logo {
+    position: relative;
+    display: block;
+}
+
+.security-logo svg {
+    display: block;
+    overflow: visible;
+}
+
+/* Main tracing animation */
+
+.trace-path {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    opacity: 0;
+
+    filter:
+        drop-shadow(0 0 3px rgba(0, 234, 255, 0.8)) drop-shadow(0 0 8px rgba(0, 234, 255, 0.35));
+}
+
+/*
+  pathLength="1" makes every path use the same
+  normalized dash range regardless of actual length.
+*/
+
+.security-logo.playing .trace-path {
+    animation:
+        trace-draw var(--duration) cubic-bezier(0.45, 0, 0.2, 1) var(--delay) forwards;
+}
+
+@keyframes trace-draw {
+    0% {
+        stroke-dashoffset: 1;
+        opacity: 0;
+    }
+
+    5% {
+        opacity: 1;
+    }
+
+    100% {
+        stroke-dashoffset: 0;
+        opacity: 1;
+    }
+}
+
+/* Web should remain delicate */
+
+.web .trace-path {
+    filter:
+        drop-shadow(0 0 2px rgba(0, 234, 255, 0.65));
+}
+
+/* Shield gets stronger glow */
+
+.shield {
+    filter:
+        drop-shadow(0 0 5px rgba(0, 234, 255, 1)) drop-shadow(0 0 14px rgba(0, 234, 255, 0.45));
+}
+
+/* Network mesh node dots */
+
+.node-dot {
+    stroke-dasharray: unset;
+    stroke-dashoffset: unset;
+    opacity: 0;
+}
+
+.security-logo.playing .node-dot {
+    animation:
+        node-appear var(--duration) ease-out var(--delay) forwards;
+}
+
+@keyframes node-appear {
+    0%   { opacity: 0; r: 2; }
+    50%  { opacity: 1; r: 5; }
+    100% { opacity: 1; r: 4; }
+}

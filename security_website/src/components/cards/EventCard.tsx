@@ -12,11 +12,17 @@ interface EventCardProps {
 function EventCard({ event, onRegister, registrationStatus }: EventCardProps) {
   return (
     <BaseCard>
+      {event.poster && (
+        <div className="card-poster">
+          <img src={event.poster} alt={`${event.title} poster`} loading="lazy" />
+        </div>
+      )}
       <div className="card-topline">
         <Badge>{event.type.toUpperCase()}</Badge>
         <span className="date">{event.date}</span>
       </div>
       <h3>{event.title}</h3>
+      {event.venue && <p className="card-venue">📍 {event.venue}</p>}
       <p>{event.description}</p>
       <div className="tag-row">
         {event.tags.map((tag) => (

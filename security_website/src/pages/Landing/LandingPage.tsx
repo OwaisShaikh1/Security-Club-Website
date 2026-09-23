@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom'
 import DraggableWorkspace from '../../components/layout/DraggableWorkspace'
 import Button from '../../components/ui/Button'
+// @ts-expect-error - JSX file without type definitions
+import SecurityLogoTrace from '../../assets/icon/SecurityLogoTrace'
 
 const startingPoints = [
   { icon: '</>', title: 'Learn by doing', text: 'Begin with guided workshops, friendly labs, and clear explanations—no experience required.' },
@@ -34,12 +36,7 @@ function LandingPage() {
           <p className="landing-reassurance">No prior knowledge. No gatekeeping. Just curiosity.</p>
         </div>
         <div className="landing-signal" aria-label="Security Club signal illustration">
-          <div className="signal-orbit orbit-one" />
-          <div className="signal-orbit orbit-two" />
-          <div className="signal-core"><span>SC</span><small>SECURE</small></div>
-          <div className="signal-label label-one">LEARN</div>
-          <div className="signal-label label-two">DEFEND</div>
-          <div className="signal-label label-three">CONNECT</div>
+          <SecurityLogoTrace size={400} />
         </div>
       </section>
 

@@ -5,6 +5,7 @@ import { getAuthSession, logout } from '../../api/client'
 import type { AuthSession } from '../../types'
 import AccessDeniedPage from '../../pages/AccessDeniedPage'
 import DraggablePanel from './DraggablePanel'
+import logo from '../../assets/data/Security Club Logo.png'
 
 interface DesktopWorkspaceProps {
   routes: AppRoute[]
@@ -709,7 +710,7 @@ function DesktopWorkspace({ routes }: DesktopWorkspaceProps) {
       <header className="navbar-wrap desktop-header-strip">
         <div className="navbar">
           <div className="brand">
-            <svg className="brand-mark" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 20 5v6c0 5-3.2 8.8-8 11-4.8-2.2-8-6-8-11V5l8-3Z" /><path d="m8.5 12 2.2 2.2 4.8-5" /></svg>
+            <img src={logo} alt="Security Club Logo" style={{ height: '32px', marginRight: '8px', objectFit: 'contain' }} />
             <span>Security Club</span>
           </div>
 

@@ -26,9 +26,11 @@ function EventsPage() {
           <label htmlFor="type">Filter by type:</label>
           <select id="type" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value as 'all' | EventType)}>
             <option value="all">All</option>
+            <option value="inauguration">Inauguration</option>
             <option value="workshop">Workshop</option>
             <option value="ctf">CTF</option>
             <option value="seminar">Seminar</option>
+            <option value="bootcamp">Bootcamp</option>
           </select>
         </div>
 

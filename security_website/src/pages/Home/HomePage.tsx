@@ -9,6 +9,8 @@ import { flagships } from '../../data/flagships'
 import { testimonials } from '../../data/testimonials'
 
 import DecodeText from '../../components/effects/DecodeText'
+// @ts-expect-error - JSX file without type definitions
+import SecurityLogoTrace from '../../assets/icon/SecurityLogoTrace'
 
 function HomePage() {
   return (
@@ -38,17 +40,7 @@ function HomePage() {
         </div>
 
         <div className="landing-signal" aria-hidden="true">
-          <div className="signal-orbit orbit-one" />
-          <div className="signal-orbit orbit-two" />
-
-          <div className="signal-core">
-            <span>SC</span>
-            <small>SECURE</small>
-          </div>
-
-          <span className="signal-label label-one">LEARN</span>
-          <span className="signal-label label-two">DEFEND</span>
-          <span className="signal-label label-three">CONNECT</span>
+          <SecurityLogoTrace size={400} />
         </div>
       </section>
 
